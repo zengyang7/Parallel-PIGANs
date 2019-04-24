@@ -165,7 +165,7 @@ def generator(z, isTrain=True, reuse=False):
         w_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.02)
         b_init = tf.constant_initializer(0.0)
         
-        deconv1 = tf.layers.conv2d_transpose(z, 256, [4, 4], strides=(1, 1), padding='valid', 
+        deconv1 = tf.layers.conv2d_transpose(z, 128, [4, 4], strides=(1, 1), padding='valid', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu1 = lrelu(tf.layers.batch_normalization(deconv1, training=isTrain), 0.2)
         # 2nd hidden layer
@@ -202,7 +202,7 @@ def discriminator(x, isTrain=True, reuse=False):
         lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain), 0.2)
         
         # 3rd hidden layer
-        conv3 = tf.layers.conv2d(lrelu2, 256, [5, 5], strides=(2, 2), padding='same', 
+        conv3 = tf.layers.conv2d(lrelu2, 128, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain), 0.2)
 
@@ -269,7 +269,9 @@ def average_gradients(tower_grads):
 
 with tf.device('/cpu:0'):
 
-    tower_grads = []
+    tower_grads_d = []
+    tower_grads_g = []
+    
     global_step = tf.Variable(0, trainable=False)
     lr = tf.train.exponential_decay(lr_setting, global_step, 500, 0.95, staircase=True)
     
@@ -314,7 +316,7 @@ with tf.device('/cpu:0'):
                 grad = tf.gradients(discriminator(X_inter, isTrain, reuse=tf.AUTO_REUSE), [X_inter])[0]
                 grad_norm = tf.sqrt(tf.reduce_sum((grad)**2, axis=1))
                 grad_pen = lam_GP * tf.reduce_mean((grad_norm - 1)**2)
-                tower_grads.append(grad)
+                
                 
                 # loss for each network
                 D_loss_real = -tf.reduce_mean(D_real_logits)
@@ -324,17 +326,27 @@ with tf.device('/cpu:0'):
                 G_loss_only = -tf.reduce_mean(D_fake_logits)
                 G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
     
-    # data type issue with this statement, I do not know why
-    grad = average_gradients(tower_grads)
-    # optimizer for each network 
-    with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-        optim = tf.train.AdamOptimizer(lr, beta1=0.5)
-        D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
-        # D_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(D_loss, var_list=D_vars)
-        G_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(G_loss, var_list=G_vars)
+                # optimizer for each network 
+                with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                    optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+                    D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
+                    G_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(G_loss, var_list=G_vars)
+                
+                grads_d = tf.gradients(D_optim, D_vars)
+                grads_g = tf.gradients(G_optim, G_vars)
+                
+                tower_grads_d.append(grads_d)
+                tower_grads_g.append(grads_g)
+    
+    tower_grads_d = average_gradients(tower_grads_d)
+    tower_grads_g = average_gradients(tower_grads_g)
+    
+    train_op_D = D_optim.apply_gradients(tower_grads_d)
+    train_op_G = G_optim.apply_gradients(tower_grads_g)
+    
     
     # FIXME: Not exactly sure where to put these
-    sess = tf.InteractiveSession()
+    sess = tf.Session()
     tf.global_variables_initializer().run()
     
     train_hist = {}
@@ -363,14 +375,14 @@ with tf.device('/cpu:0'):
         # Total problem size unchanged => strong scaling
         for iter in range(train_set.shape[0] // (num_gpus*batch_size)):
             # training discriminator
-            x_ = train_set[iter*num_gpus*batch_size:(iter+1)*nm_gpus*batch_size]
+            x_ = train_set[iter*num_gpus*batch_size:(iter+1)*num_gpus*batch_size]
             z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
             
-            loss_d_, _ = sess.run([D_loss, D_optim], {x: x_, z: z_, isTrain: True})
+            loss_d_, _ = sess.run([D_loss, train_op_D], {x: x_, z: z_, isTrain: True})
             
             # training generator
             z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
-            loss_g_, _ = sess.run([G_loss, G_optim], {z:z_, x:x_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: True})
+            loss_g_, _ = sess.run([G_loss, train_op_G], {z:z_, x:x_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: True})
     
             errD = D_loss.eval({z:z_, x:x_, filtertf:filter_batch, isTrain: False})
             errG = G_loss_only.eval({z: z_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: False})
