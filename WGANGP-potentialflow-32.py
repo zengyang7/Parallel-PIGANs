@@ -24,7 +24,7 @@ np.random.seed(1)
 num_gpus = 1
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 2
+train_epoch = 20
 lr_setting = 0.0005
 
 # number of mesh
@@ -332,17 +332,18 @@ with tf.device('/cpu:0'):
                     #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
                     G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
                 
-                grads_d = D_optim.compute_gradients(D_loss)
-                grads_g = G_optim.compute_gradients(G_loss)
+                grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
+                grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
                 
-                tower_grads_d.append(grads_d)
-                tower_grads_g.append(grads_g)
+                # FIXME: Test single GPU first
+                #tower_grads_d.append(grads_d)
+                #tower_grads_g.append(grads_g)
     
-    tower_grads_d = average_gradients(tower_grads_d)
-    tower_grads_g = average_gradients(tower_grads_g)
+    #tower_grads_d = average_gradients(tower_grads_d)
+    #tower_grads_g = average_gradients(tower_grads_g)
     
-    train_op_D = D_optim.apply_gradients(tower_grads_d)
-    train_op_G = G_optim.apply_gradients(tower_grads_g)
+    train_op_D = D_optim.apply_gradients(grads_d, global_step = global_step)
+    train_op_G = G_optim.apply_gradients(grads_g)
     
     
     # FIXME: Not exactly sure where to put these
