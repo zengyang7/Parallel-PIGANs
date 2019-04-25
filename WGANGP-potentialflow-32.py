@@ -286,7 +286,7 @@ with tf.device('/cpu:0'):
       
     for i in range(num_gpus):
         with tf.device('/gpu:%d' % i):
-            with tf.name_scope('tower_%d' % i):
+            with tf.name_scope('tower_%d' % (i)) as scope:
 
                 _x = x[i * batch_size:(i + 1) * batch_size]
                 _z = z[i * batch_size:(i + 1) * batch_size]
@@ -329,21 +329,26 @@ with tf.device('/cpu:0'):
                 # optimizer for each network 
                 with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
                     D_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
-                    #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
                     G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+                    #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
                 
+                # May need to specify var_list, otherwise incorrect
                 grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
                 grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
                 
                 # FIXME: Test single GPU first
                 #tower_grads_d.append(grads_d)
                 #tower_grads_g.append(grads_g)
+
+                #tf.get_variable_scope().reuse_variables()
     
     #tower_grads_d = average_gradients(tower_grads_d)
     #tower_grads_g = average_gradients(tower_grads_g)
     
     train_op_D = D_optim.apply_gradients(grads_d, global_step = global_step)
     train_op_G = G_optim.apply_gradients(grads_g)
+    #train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
+    #train_op_G = G_optim.apply_gradients(tower_grads_g)
     
     
     # FIXME: Not exactly sure where to put these
