@@ -348,7 +348,8 @@ with tf.device('/cpu:0'):
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     
-            var_scope.reuse_variables()
+            # FIXME: Not sure whether we need it
+            #var_scope.reuse_variables()
     
             tower_grads_d = average_gradients(tower_grads_d)
             tower_grads_g = average_gradients(tower_grads_g)
