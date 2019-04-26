@@ -24,7 +24,7 @@ np.random.seed(1)
 num_gpus = 1
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 20
+train_epoch = 50
 lr_setting = 0.0005
 
 # number of mesh
@@ -284,72 +284,75 @@ with tf.device('/cpu:0'):
     dy = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh))
     filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
       
-    for i in range(num_gpus):
-        with tf.device('/gpu:%d' % i):
-            with tf.name_scope('tower_%d' % (i)) as scope:
+    with tf.variable_scope(tf.get_variable_scope()) as scope:
+        for i in range(num_gpus):
+            with tf.device('/gpu:%d' % i):
+                with tf.name_scope('tower_%d' % (i)) as scope:
 
-                _x = x[i * batch_size:(i + 1) * batch_size]
-                _z = z[i * batch_size:(i + 1) * batch_size]
-    
-                # networks : generator
-                G_z = generator(_z, isTrain)
-                
-                # networks : discriminator
-                D_real, D_real_logits = discriminator(_x, isTrain)
-                D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
+                    _x = x[i * batch_size:(i + 1) * batch_size]
+                    _z = z[i * batch_size:(i + 1) * batch_size]
+        
+                    # networks : generator
+                    G_z = generator(_z, isTrain)
+                    
+                    # networks : discriminator
+                    D_real, D_real_logits = discriminator(_x, isTrain)
+                    D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
 
-                # add constraints
-                delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
-                
-                # trainable variables for each network
-                T_vars = tf.trainable_variables()
-                D_vars = [var for var in T_vars if var.name.startswith('discriminator')]
-                G_vars = [var for var in T_vars if var.name.startswith('generator')]
-                
-                lam_GP = 10
-                
-                # WGAN-GP
-                eps = tf.random_uniform([batch_size, 1], minval=0., maxval=1.)
-                eps = tf.reshape(eps,[batch_size, 1, 1, 1])
-                eps = eps * np.ones([batch_size, n_mesh, n_mesh, 3])
-                X_inter = eps*_x + (1. - eps)*G_z
-                grad = tf.gradients(discriminator(X_inter, isTrain, reuse=tf.AUTO_REUSE), [X_inter])[0]
-                grad_norm = tf.sqrt(tf.reduce_sum((grad)**2, axis=1))
-                grad_pen = lam_GP * tf.reduce_mean((grad_norm - 1)**2)
-                
-                
-                # loss for each network
-                D_loss_real = -tf.reduce_mean(D_real_logits)
-                D_loss_fake = tf.reduce_mean(D_fake_logits)
-                D_loss = D_loss_real + D_loss_fake + grad_pen
-                delta_loss = tf.reduce_mean(delta_lose)
-                G_loss_only = -tf.reduce_mean(D_fake_logits)
-                G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
-    
-                # optimizer for each network 
-                with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                    D_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
-                    G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
-                    #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
-                
-                # May need to specify var_list, otherwise incorrect
-                grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
-                grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
-                
-                # FIXME: Test single GPU first
-                #tower_grads_d.append(grads_d)
-                #tower_grads_g.append(grads_g)
+                    # add constraints
+                    delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
+                    
+                    # trainable variables for each network
+                    T_vars = tf.trainable_variables()
+                    D_vars = [var for var in T_vars if var.name.startswith('discriminator')]
+                    G_vars = [var for var in T_vars if var.name.startswith('generator')]
+                    
+                    lam_GP = 10
+                    
+                    # WGAN-GP
+                    eps = tf.random_uniform([batch_size, 1], minval=0., maxval=1.)
+                    eps = tf.reshape(eps,[batch_size, 1, 1, 1])
+                    eps = eps * np.ones([batch_size, n_mesh, n_mesh, 3])
+                    X_inter = eps*_x + (1. - eps)*G_z
+                    grad = tf.gradients(discriminator(X_inter, isTrain, reuse=tf.AUTO_REUSE), [X_inter])[0]
+                    grad_norm = tf.sqrt(tf.reduce_sum((grad)**2, axis=1))
+                    grad_pen = lam_GP * tf.reduce_mean((grad_norm - 1)**2)
+                    
+                    
+                    # loss for each network
+                    D_loss_real = -tf.reduce_mean(D_real_logits)
+                    D_loss_fake = tf.reduce_mean(D_fake_logits)
+                    D_loss = D_loss_real + D_loss_fake + grad_pen
+                    delta_loss = tf.reduce_mean(delta_lose)
+                    G_loss_only = -tf.reduce_mean(D_fake_logits)
+                    G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
+        
+                    # optimizer for each network 
+                    with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                        D_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+                        G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+                        #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
+                    
+                    # May need to specify var_list, otherwise incorrect
+                    grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
+                    grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
+                    
+                    # FIXME: Test single GPU first
+                    #tower_grads_d.append(grads_d)
+                    #tower_grads_g.append(grads_g)
 
-                #tf.get_variable_scope().reuse_variables()
+                    #scope.reuse_variables()
+                    #tf.get_variable_scope().reuse_variables()
+
+    with tf.variable_scope(tf.get_variable_scope()) as scope:
+
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     
-    #tower_grads_d = average_gradients(tower_grads_d)
-    #tower_grads_g = average_gradients(tower_grads_g)
+    tower_grads_d = average_gradients(tower_grads_d)
+    tower_grads_g = average_gradients(tower_grads_g)
     
-    train_op_D = D_optim.apply_gradients(grads_d, global_step = global_step)
-    train_op_G = G_optim.apply_gradients(grads_g)
-    #train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
-    #train_op_G = G_optim.apply_gradients(tower_grads_g)
-    
+    train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
+    train_op_G = G_optim.apply_gradients(tower_grads_g)
     
     # FIXME: Not exactly sure where to put these
     #sess = tf.Session()
