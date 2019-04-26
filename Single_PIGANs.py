@@ -18,7 +18,7 @@ np.random.seed(1)
 # parameter need to be changed
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 120
+train_epoch = 2
 lr_setting = 0.0005
 
 # number of mesh
@@ -277,7 +277,7 @@ for epoch in range(train_epoch+1):
         train_set,_ = sess.run(next_element_train)
         train_set[:,:,:,0:2] = (train_set[:,:,:,0:2]-(nor_max_v+nor_min_v)/2)/(1.1*(nor_max_v-nor_min_v)/2)
         train_set[:,:,:,2] = (train_set[:,:,:,2]-(nor_max_p+nor_min_p)/2)/(1.1*(nor_max_p-nor_min_p)/2)
-        x_ = train_set
+x_ = train_set
         z_ = np.random.normal(0, 1, (batch_size, 1, 1, 100))
         
         loss_d_, _ = sess.run([D_loss, D_optim], {x: x_, z: z_, isTrain: True})
