@@ -21,10 +21,10 @@ tf.reset_default_graph()
 np.random.seed(1)
 
 # parameter need to be changed
-num_gpus = 1
+num_gpus = 2
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 120
+train_epoch = 50
 lr_setting = 0.0005
 
 # number of mesh
@@ -284,148 +284,165 @@ with tf.device('/cpu:0'):
     dy = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh))
     filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
       
-    for i in range(num_gpus):
-        with tf.device('/gpu:%d' % i):
-            with tf.name_scope('tower_%d' % i):
+    with tf.variable_scope(tf.get_variable_scope()) as var_scope:
+        for i in range(num_gpus):
+            with tf.device('/gpu:%d' % i):
+                with tf.name_scope('tower_%d' % (i)) as scope:
 
-                _x = x[i * batch_size:(i + 1) * batch_size]
-                _z = z[i * batch_size:(i + 1) * batch_size]
-    
-                # networks : generator
-                G_z = generator(_z, isTrain)
-                
-                # networks : discriminator
-                D_real, D_real_logits = discriminator(_x, isTrain)
-                D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
-
-                # add constraints
-                delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
-                
-                # trainable variables for each network
-                T_vars = tf.trainable_variables()
-                D_vars = [var for var in T_vars if var.name.startswith('discriminator')]
-                G_vars = [var for var in T_vars if var.name.startswith('generator')]
-                
-                lam_GP = 10
-                
-                # WGAN-GP
-                eps = tf.random_uniform([batch_size, 1], minval=0., maxval=1.)
-                eps = tf.reshape(eps,[batch_size, 1, 1, 1])
-                eps = eps * np.ones([batch_size, n_mesh, n_mesh, 3])
-                X_inter = eps*_x + (1. - eps)*G_z
-                grad = tf.gradients(discriminator(X_inter, isTrain, reuse=tf.AUTO_REUSE), [X_inter])[0]
-                grad_norm = tf.sqrt(tf.reduce_sum((grad)**2, axis=1))
-                grad_pen = lam_GP * tf.reduce_mean((grad_norm - 1)**2)
-                
-                
-                # loss for each network
-                D_loss_real = -tf.reduce_mean(D_real_logits)
-                D_loss_fake = tf.reduce_mean(D_fake_logits)
-                D_loss = D_loss_real + D_loss_fake + grad_pen
-                delta_loss = tf.reduce_mean(delta_lose)
-                G_loss_only = -tf.reduce_mean(D_fake_logits)
-                G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
-    
-                # optimizer for each network 
-                with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                    optim = tf.train.AdamOptimizer(lr, beta1=0.5)
-                    D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
-                    G_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(G_loss, var_list=G_vars)
-                
-                grads_d = tf.gradients(D_optim, D_vars)
-                grads_g = tf.gradients(G_optim, G_vars)
-                
-                tower_grads_d.append(grads_d)
-                tower_grads_g.append(grads_g)
-    
-    tower_grads_d = average_gradients(tower_grads_d)
-    tower_grads_g = average_gradients(tower_grads_g)
-    
-    train_op_D = D_optim.apply_gradients(tower_grads_d)
-    train_op_G = G_optim.apply_gradients(tower_grads_g)
-    
-    
-    # FIXME: Not exactly sure where to put these
-    sess = tf.Session()
-    tf.global_variables_initializer().run()
-    
-    train_hist = {}
-    train_hist['D_losses'] = []
-    train_hist['G_losses'] = []
-    train_hist['delta_real'] = []
-    train_hist['delta_lose'] = []
-    train_hist['prediction'] = []
-    train_hist['prediction_fit'] = []
-    train_hist['ratio'] = []
-    
-    # save model and all variables
-    saver = tf.train.Saver()
-
-    # training-loop
-    np.random.seed(int(time.time()))
-    print('training start!')
-    start_time = time.time()
-    
-    for epoch in range(train_epoch+1):
-        G_losses = []
-        D_losses = []
-        delta_real_record = []
-        delta_lose_record = []
-        epoch_start_time = time.time()
-        # Total problem size unchanged => strong scaling
-        for iter in range(train_set.shape[0] // (num_gpus*batch_size)):
-            # training discriminator
-            x_ = train_set[iter*num_gpus*batch_size:(iter+1)*num_gpus*batch_size]
-            z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
-            
-            loss_d_, _ = sess.run([D_loss, train_op_D], {x: x_, z: z_, isTrain: True})
-            
-            # training generator
-            z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
-            loss_g_, _ = sess.run([G_loss, train_op_G], {z:z_, x:x_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: True})
-    
-            errD = D_loss.eval({z:z_, x:x_, filtertf:filter_batch, isTrain: False})
-            errG = G_loss_only.eval({z: z_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: False})
-            errdelta_real = divergence_mean.eval({z:z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
-            errdelta_lose = delta_lose.eval({z: z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
-            
-            D_losses.append(errD)
-            G_losses.append(errG)
-            delta_real_record.append(errdelta_real)
-            delta_lose_record.append(errdelta_lose)
-    
-        epoch_end_time = time.time()
-        if math.isnan(np.mean(G_losses)):
-            break
-        per_epoch_ptime = epoch_end_time - epoch_start_time
-        print('[%d/%d] - ptime: %.2f loss_d: %.3f, loss_g: %.3f, delta: %.3f' % 
-              ((epoch + 1), train_epoch, per_epoch_ptime, np.mean(D_losses), np.mean(G_losses), np.mean(delta_real_record)))
-        train_hist['D_losses'].append(np.mean(D_losses))
-        train_hist['G_losses'].append(np.mean(G_losses))
-        train_hist['delta_real'].append(np.mean(delta_real_record))
-        train_hist['delta_lose'].append(np.mean(delta_lose_record))
-        ### need change every time, PF: potential flow, 
-        #root + 'PF-WGANGP-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
+                    _x = x[i * batch_size:(i + 1) * batch_size]
+                    _z = z[i * batch_size:(i + 1) * batch_size]
         
-        z_pred = np.random.normal(0, 1, (16, 1, 1, 100))
-        prediction = G_z.eval({z:z_pred, isTrain: False})
-        #prediction = prediction*np.max(U)+np.max(U)/2
-        prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
-        prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
-        train_hist['prediction'].append(prediction)
-        #plot_samples(X, Y, prediction)
-        #plot_samples(X, Y, prediction, name)
-        if epoch % 20 == 0:
-            np.random.seed(1)
-            z_pred = np.random.normal(0, 1, (2000, 1, 1, 100))
+                    # networks : generator
+                    G_z = generator(_z, isTrain)
+                    
+                    # networks : discriminator
+                    D_real, D_real_logits = discriminator(_x, isTrain, reuse=tf.AUTO_REUSE)
+                    D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
+
+                    # add constraints
+                    delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
+                    
+                    # trainable variables for each network
+                    T_vars = tf.trainable_variables()
+                    D_vars = [var for var in T_vars if var.name.startswith('discriminator')]
+                    G_vars = [var for var in T_vars if var.name.startswith('generator')]
+                    
+                    lam_GP = 10
+                    
+                    # WGAN-GP
+                    eps = tf.random_uniform([batch_size, 1], minval=0., maxval=1.)
+                    eps = tf.reshape(eps,[batch_size, 1, 1, 1])
+                    eps = eps * np.ones([batch_size, n_mesh, n_mesh, 3])
+                    X_inter = eps*_x + (1. - eps)*G_z
+                    grad = tf.gradients(discriminator(X_inter, isTrain, reuse=tf.AUTO_REUSE), [X_inter])[0]
+                    grad_norm = tf.sqrt(tf.reduce_sum((grad)**2, axis=1))
+                    grad_pen = lam_GP * tf.reduce_mean((grad_norm - 1)**2)
+                    
+                    
+                    # loss for each network
+                    D_loss_real = -tf.reduce_mean(D_real_logits)
+                    D_loss_fake = tf.reduce_mean(D_fake_logits)
+                    D_loss = D_loss_real + D_loss_fake + grad_pen
+                    delta_loss = tf.reduce_mean(delta_lose)
+                    G_loss_only = -tf.reduce_mean(D_fake_logits)
+                    G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
+        
+                    var_scope.reuse_variables()
+                    #tf.get_variable_scope().reuse_variables()
+
+                    # optimizer for each network 
+                    with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                        D_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+                        G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
+                        #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
+                    
+                        # FIXME: Not sure whether I need to indent the following 4 statements or not
+                        # May need to specify var_list, otherwise incorrect
+                        grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
+                        grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
+                        
+                        tower_grads_d.append(grads_d)
+                        tower_grads_g.append(grads_g)
+
+    with tf.variable_scope(tf.get_variable_scope()) as var_scope:
+
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+    
+            # FIXME: Not sure whether we need it
+            #var_scope.reuse_variables()
+    
+            tower_grads_d = average_gradients(tower_grads_d)
+            tower_grads_g = average_gradients(tower_grads_g)
+            
+            train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
+            train_op_G = G_optim.apply_gradients(tower_grads_g)
+
+    #sess = tf.Session()
+    #tf.global_variables_initializer().run()
+    init=tf.global_variables_initializer()
+    
+    with tf.Session() as sess:
+
+
+        sess.run(init)
+
+        train_hist = {}
+        train_hist['D_losses'] = []
+        train_hist['G_losses'] = []
+        train_hist['delta_real'] = []
+        train_hist['delta_lose'] = []
+        train_hist['prediction'] = []
+        train_hist['prediction_fit'] = []
+        train_hist['ratio'] = []
+        
+        # save model and all variables
+        saver = tf.train.Saver()
+
+        # training-loop
+        np.random.seed(int(time.time()))
+        print('training start!')
+        start_time = time.time()
+        
+        for epoch in range(train_epoch+1):
+            G_losses = []
+            D_losses = []
+            delta_real_record = []
+            delta_lose_record = []
+            epoch_start_time = time.time()
+            # Total problem size unchanged => strong scaling
+            for iter in range(train_set.shape[0] // (num_gpus*batch_size)):
+                # training discriminator
+                x_ = train_set[iter*num_gpus*batch_size:(iter+1)*num_gpus*batch_size]
+                z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
+                
+                loss_d_, _ = sess.run([D_loss, train_op_D], {x: x_, z: z_, isTrain: True})
+                
+                # training generator
+                z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
+                loss_g_, _ = sess.run([G_loss, train_op_G], {z:z_, x:x_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: True})
+        
+                errD = D_loss.eval({z:z_, x:x_, filtertf:filter_batch, isTrain: False})
+                errG = G_loss_only.eval({z: z_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: False})
+                errdelta_real = divergence_mean.eval({z:z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
+                errdelta_lose = delta_lose.eval({z: z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
+                
+                D_losses.append(errD)
+                G_losses.append(errG)
+                delta_real_record.append(errdelta_real)
+                delta_lose_record.append(errdelta_lose)
+        
+            epoch_end_time = time.time()
+            if math.isnan(np.mean(G_losses)):
+                break
+            per_epoch_ptime = epoch_end_time - epoch_start_time
+            print('[%d/%d] - ptime: %.2f loss_d: %.3f, loss_g: %.3f, delta: %.3f' % 
+                  ((epoch + 1), train_epoch, per_epoch_ptime, np.mean(D_losses), np.mean(G_losses), np.mean(delta_real_record)))
+            train_hist['D_losses'].append(np.mean(D_losses))
+            train_hist['G_losses'].append(np.mean(G_losses))
+            train_hist['delta_real'].append(np.mean(delta_real_record))
+            train_hist['delta_lose'].append(np.mean(delta_lose_record))
+            ### need change every time, PF: potential flow, 
+            #root + 'PF-WGANGP-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
+            
+            z_pred = np.random.normal(0, 1, (16, 1, 1, 100))
             prediction = G_z.eval({z:z_pred, isTrain: False})
+            #prediction = prediction*np.max(U)+np.max(U)/2
             prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
             prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
-            train_hist['prediction_fit'].append(prediction)
+            train_hist['prediction'].append(prediction)
+            #plot_samples(X, Y, prediction)
+            #plot_samples(X, Y, prediction, name)
+            if epoch % 20 == 0:
+                np.random.seed(1)
+                z_pred = np.random.normal(0, 1, (2000, 1, 1, 100))
+                prediction = G_z.eval({z:z_pred, isTrain: False})
+                prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+                prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
+                train_hist['prediction_fit'].append(prediction)
 
-    end_time = time.time()
-    total_ptime = end_time - start_time
-    name_data = root + 'PF-32-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
-    np.savez_compressed(name_data, a=train_hist, b=per_epoch_ptime)
-    save_model = name_data+'.ckpt'
-    save_path = saver.save(sess, save_model)
+        end_time = time.time()
+        total_ptime = end_time - start_time
+        name_data = root + 'PF-32-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
+        np.savez_compressed(name_data, a=train_hist, b=per_epoch_ptime)
+        save_model = name_data+'.ckpt'
+        save_path = saver.save(sess, save_model)
