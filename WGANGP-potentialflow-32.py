@@ -348,11 +348,11 @@ with tf.device('/cpu:0'):
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     
-    tower_grads_d = average_gradients(tower_grads_d)
-    tower_grads_g = average_gradients(tower_grads_g)
-    
-    train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
-    train_op_G = G_optim.apply_gradients(tower_grads_g)
+            tower_grads_d = average_gradients(tower_grads_d)
+            tower_grads_g = average_gradients(tower_grads_g)
+            
+            train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
+            train_op_G = G_optim.apply_gradients(tower_grads_g)
     
     # FIXME: Not exactly sure where to put these
     #sess = tf.Session()
