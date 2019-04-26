@@ -21,7 +21,7 @@ tf.reset_default_graph()
 np.random.seed(1)
 
 # parameter need to be changed
-num_gpus = 1
+num_gpus = 2
 cons_value = 0
 lam_cons = 0.2
 train_epoch = 50
@@ -284,7 +284,7 @@ with tf.device('/cpu:0'):
     dy = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh))
     filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
       
-    with tf.variable_scope(tf.get_variable_scope()) as scope:
+    with tf.variable_scope(tf.get_variable_scope()) as var_scope:
         for i in range(num_gpus):
             with tf.device('/gpu:%d' % i):
                 with tf.name_scope('tower_%d' % (i)) as scope:
@@ -296,7 +296,7 @@ with tf.device('/cpu:0'):
                     G_z = generator(_z, isTrain)
                     
                     # networks : discriminator
-                    D_real, D_real_logits = discriminator(_x, isTrain)
+                    D_real, D_real_logits = discriminator(_x, isTrain, reuse=tf.AUTO_REUSE)
                     D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
 
                     # add constraints
@@ -340,10 +340,10 @@ with tf.device('/cpu:0'):
                     tower_grads_d.append(grads_d)
                     tower_grads_g.append(grads_g)
 
-                    #scope.reuse_variables()
+                    var_scope.reuse_variables()
                     #tf.get_variable_scope().reuse_variables()
 
-    with tf.variable_scope(tf.get_variable_scope()) as scope:
+    with tf.variable_scope(tf.get_variable_scope()) as var_scope:
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     
@@ -352,6 +352,8 @@ with tf.device('/cpu:0'):
             
             train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
             train_op_G = G_optim.apply_gradients(tower_grads_g)
+
+            var_scope.reuse_variables()
     
     #sess = tf.Session()
     #tf.global_variables_initializer().run()
