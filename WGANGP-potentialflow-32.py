@@ -327,25 +327,28 @@ with tf.device('/cpu:0'):
                     G_loss_only = -tf.reduce_mean(D_fake_logits)
                     G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
         
+                    var_scope.reuse_variables()
+                    #tf.get_variable_scope().reuse_variables()
+
                     # optimizer for each network 
                     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
                         D_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
                         G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
                         #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
                     
-                    # May need to specify var_list, otherwise incorrect
-                    grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
-                    grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
-                    
-                    tower_grads_d.append(grads_d)
-                    tower_grads_g.append(grads_g)
-
-                    var_scope.reuse_variables()
-                    #tf.get_variable_scope().reuse_variables()
+                        # FIXME: Not sure whether I need to indent the following 4 statements or not
+                        # May need to specify var_list, otherwise incorrect
+                        grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
+                        grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
+                        
+                        tower_grads_d.append(grads_d)
+                        tower_grads_g.append(grads_g)
 
     with tf.variable_scope(tf.get_variable_scope()) as var_scope:
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+    
+            var_scope.reuse_variables()
     
             tower_grads_d = average_gradients(tower_grads_d)
             tower_grads_g = average_gradients(tower_grads_g)
@@ -353,8 +356,6 @@ with tf.device('/cpu:0'):
             train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
             train_op_G = G_optim.apply_gradients(tower_grads_g)
 
-            var_scope.reuse_variables()
-    
     #sess = tf.Session()
     #tf.global_variables_initializer().run()
     init=tf.global_variables_initializer()
