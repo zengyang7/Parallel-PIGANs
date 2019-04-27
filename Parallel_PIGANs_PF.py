@@ -317,7 +317,6 @@ with tf.device('/cpu:0'):
                     grad_norm = tf.sqrt(tf.reduce_sum((grad)**2, axis=1))
                     grad_pen = lam_GP * tf.reduce_mean((grad_norm - 1)**2)
                     
-                    
                     # loss for each network
                     D_loss_real = -tf.reduce_mean(D_real_logits)
                     D_loss_fake = tf.reduce_mean(D_fake_logits)

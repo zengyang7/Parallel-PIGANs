@@ -263,7 +263,7 @@ filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
 G_z = generator(z, isTrain)
 
 # networks : discriminator
-D_real, D_real_logits = discriminator(x, isTrain)
+D_real, D_real_logits = discriminator(x, isTrain, reuse=tf.AUTO_REUSE)
 D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
 delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
 
@@ -299,7 +299,9 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     G_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(G_loss, var_list=G_vars)
 
 sess = tf.InteractiveSession()
-tf.global_variables_initializer().run()
+init=tf.global_variables_initializer()
+
+sess.run(init)
 
 train_hist = {}
 train_hist['D_losses'] = []
