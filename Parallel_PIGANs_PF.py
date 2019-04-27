@@ -120,9 +120,9 @@ nor_min_p = np.min(U[:,:,:,2])
 # compress the samples into [-1, 1]
 U[:,:,:,0:2] = (U[:,:,:,0:2]-(nor_max_v+nor_min_v)/2)/(1.1*(nor_max_v-nor_min_v)/2)
 U[:,:,:,2] = (U[:,:,:,2]-(nor_max_p+nor_min_p)/2)/(1.1*(nor_max_p-nor_min_p)/2)
-# FIXME: deallocate U to free memory?
 train_set   = U
 train_label = samples
+del U
 
 # use to calculate divergence
 # This may takes a lot of memory as the mesh is cartesian
@@ -326,7 +326,6 @@ with tf.device('/cpu:0'):
                     G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
         
                     var_scope.reuse_variables()
-                    #tf.get_variable_scope().reuse_variables()
 
                     # optimizer for each network 
                     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
@@ -334,8 +333,6 @@ with tf.device('/cpu:0'):
                         G_optim = tf.train.AdamOptimizer(lr, beta1=0.5)
                         #D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
                     
-                        # FIXME: Not sure whether I need to indent the following 4 statements or not
-                        # May need to specify var_list, otherwise incorrect
                         grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
                         grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
                         
@@ -346,15 +343,15 @@ with tf.device('/cpu:0'):
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     
-            # FIXME: Not sure whether we need it
-            #var_scope.reuse_variables()
-    
             tower_grads_d = average_gradients(tower_grads_d)
             tower_grads_g = average_gradients(tower_grads_g)
             
             train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
             train_op_G = G_optim.apply_gradients(tower_grads_g)
 
+            # FIXME: Need to put it here or comment it. Do not know why
+            var_scope.reuse_variables()
+    
     #sess = tf.Session()
     #tf.global_variables_initializer().run()
     init=tf.global_variables_initializer()

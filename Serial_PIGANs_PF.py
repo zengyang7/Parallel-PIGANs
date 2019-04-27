@@ -121,7 +121,6 @@ train_set = U
 train_label = samples
 
 # use to calculate divergence
-# This may takes a lot of memory as the mesh is cartesian
 d_x = X[:,1:]-X[:,:-1]
 d_y = Y[1:,:]-Y[:-1,:]
 d_x_ = np.tile(d_x, (batch_size, 1)).reshape([batch_size, n_mesh, n_mesh-1])
@@ -293,9 +292,6 @@ with tf.variable_scope(tf.get_variable_scope()) as var_scope:
     G_loss_only = -tf.reduce_mean(D_fake_logits)
     G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
 
-    # FIXME: Need to comment this to run, do not know why
-    #var_scope.reuse_variables()
-    
     # optimizer for each network 
     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         optim = tf.train.AdamOptimizer(lr, beta1=0.5)
