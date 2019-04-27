@@ -293,7 +293,8 @@ with tf.variable_scope(tf.get_variable_scope()) as var_scope:
     G_loss_only = -tf.reduce_mean(D_fake_logits)
     G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
 
-    var_scope.reuse_variables()
+    # FIXME: Need to comment this to run, do not know why
+    #var_scope.reuse_variables()
     
     # optimizer for each network 
     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
