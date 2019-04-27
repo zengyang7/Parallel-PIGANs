@@ -30,6 +30,7 @@ lr_setting = 0.0005
 n_mesh = 32 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
+factor = 10
 
 print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_setting, train_epoch))
 
@@ -128,7 +129,8 @@ d_y_ = np.tile(d_y, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh])
 
 # use to filter divergence
 filter = np.ones((n_mesh-1, n_mesh-1))
-filter[13:18,13:18] = 0
+filter[int(n_mesh/2)-int(n_mesh/factor):int(n_mesh/2)+int(n_mesh/factor),
+       int(n_mesh/2)-int(n_mesh/factor):int(n_mesh/2)+int(n_mesh/factor)] = 0
 filter_batch = np.tile(filter, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh-1])
 
 #----------------------------------------------------------------------------#
