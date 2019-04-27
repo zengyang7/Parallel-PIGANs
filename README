@@ -1,0 +1,3 @@
+Serial_PIGANs_PF.py: Original serial python file: run on single CPU or single CPU
+
+Parallel_PIGANs_PF.py: Multi-GPU version of Serial_PIGANs_PF.py: run on multiple GPUs (including 1)
