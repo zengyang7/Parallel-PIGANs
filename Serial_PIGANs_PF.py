@@ -12,6 +12,11 @@ import numpy as np
 import os, time, random
 import math
 
+# record loss function for each network
+root = './Potentialflow-results/'
+if not os.path.isdir(root):
+    os.mkdir(root)
+
 tf.reset_default_graph()
 np.random.seed(1)
 
@@ -22,11 +27,27 @@ train_epoch = 120
 lr_setting = 0.0005
 
 # number of mesh
-n_mesh = 32
+n_mesh = 32 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
 
 print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_setting, train_epoch))
+
+# setting of training samples
+n_sam = 20000
+V_mu, V_sigma = 4, 0.8
+alpha_mu, alpha_sigma = 0, np.pi/4
+m_mu, m_sigma = 1, 0.2
+
+samples = np.zeros([n_sam, 3])
+
+V_sample = np.random.normal(V_mu, V_sigma, n_sam)
+alpha_sample = np.random.normal(alpha_mu, alpha_sigma, n_sam)
+m_sample = np.random.normal(m_mu, m_sigma, n_sam)
+
+samples[:,0] = V_sample
+samples[:,1] = alpha_sample
+samples[:,2] = m_sample
 
 # generate samples
 def generate_sample(n, parameter):
@@ -45,9 +66,9 @@ def generate_sample(n, parameter):
     x = [-0.5, 0.5]
     y = [-0.5, 0.5]
     x_mesh = np.linspace(x[0], x[1], int(n))
-   
     y_mesh = np.linspace(y[0], y[1], int(n))
-    
+
+    # For all samples, X and Y are the same (on a same mesh) 
     X, Y = np.meshgrid(x_mesh, y_mesh)  
     U = []
     
@@ -80,26 +101,9 @@ def generate_sample(n, parameter):
         U.append(U_data)
     return X, Y, np.asarray(U)
 
-# setting of training samples
-n_sam = 20000
-V_mu, V_sigma = 4, 0.8
-alpha_mu, alpha_sigma = 0, np.pi/4
-m_mu, m_sigma = 1, 0.2
-
-samples = np.zeros([n_sam, 3])
-
-V_sample = np.random.normal(V_mu, V_sigma, n_sam)
-alpha_sample = np.random.normal(alpha_mu, alpha_sigma, n_sam)
-m_sample = np.random.normal(m_mu, m_sigma, n_sam)
-
-samples[:,0] = V_sample
-samples[:,1] = alpha_sample
-samples[:,2] = m_sample
-
 #training samples
 X, Y, U = generate_sample(n=n_mesh, parameter=samples)
 
-#plot_samples(X,Y,U,lvls)
 # normalization
 nor_max_v = np.max(U[:,:,:,0:2])
 nor_min_v = np.min(U[:,:,:,0:2])
@@ -117,6 +121,7 @@ train_set = U
 train_label = samples
 
 # use to calculate divergence
+# This may takes a lot of memory as the mesh is cartesian
 d_x = X[:,1:]-X[:,:-1]
 d_y = Y[1:,:]-Y[:-1,:]
 d_x_ = np.tile(d_x, (batch_size, 1)).reshape([batch_size, n_mesh, n_mesh-1])
@@ -286,12 +291,6 @@ delta_loss = tf.reduce_mean(delta_lose)
 G_loss_only = -tf.reduce_mean(D_fake_logits)
 G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
 
-
-# record loss function for each network
-root = './Potentialflow-results/'
-if not os.path.isdir(root):
-    os.mkdir(root)
-
 # optimizer for each network 
 with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     optim = tf.train.AdamOptimizer(lr, beta1=0.5)
@@ -318,9 +317,6 @@ saver = tf.train.Saver()
 np.random.seed(int(time.time()))
 print('training start!')
 start_time = time.time()
-
-d_x_ = np.tile(d_x, (batch_size, 1)).reshape([batch_size, n_mesh, n_mesh-1])
-d_y_ = np.tile(d_y, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh])
 
 for epoch in range(train_epoch+1):
     G_losses = []
