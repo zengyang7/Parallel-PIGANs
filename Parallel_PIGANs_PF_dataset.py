@@ -455,7 +455,7 @@ with tf.device('/cpu:0'):
 
         end_time = time.time()
         total_ptime = end_time - start_time
-        name_data = root + 'PF-32-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
+        name_data = root + 'Parallel-results'+'-ep'+str(train_epoch)
         np.savez_compressed(name_data, a=train_hist, b=per_epoch_ptime)
         save_model = name_data+'.ckpt'
         save_path = saver.save(sess, save_model)
