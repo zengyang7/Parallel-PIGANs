@@ -1,3 +1,11 @@
 Serial_PIGANs_PF.py: Original serial python file: run on single CPU or single CPU
 
-Parallel_PIGANs_PF.py: Multi-GPU version of Serial_PIGANs_PF.py: run on multiple GPUs (including 1)
+Parallel_PIGANs_PF.py: synchronous Multi-GPU version of Serial_PIGANs_PF.py: run on multiple GPUs (including 1)
+
+Parallel_PIGANs_PF_async.py: Multi-GPU version with asynchronous training. Speed should be faster than the synchronous version, but more unstable
+
+Parallel_PIGANs_dataset.py: synchronous Multi-GPU version, using datasets
+
+write_tfrecord.py: dataset output file
+
+
