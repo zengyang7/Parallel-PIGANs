@@ -76,7 +76,7 @@ def generate_sample(n, parameter):
     U    = []
     
     # What is the index i used for?
-    for i, p in enumerate(parameter):
+    for p in parameter:
         V = p[0]
         alpha  = p[1]
         m = p[2]
@@ -216,8 +216,6 @@ def discriminator(x, isTrain=True, reuse=False):
 
 def constraints(x, dx, dy, filtertf):
     # inverse normalization
-    # operation on the whole data, including p?
-    x = x*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
     '''
     This function is the constraints of potentianl flow, 
     L Phi = 0, L is the laplace calculator
@@ -227,6 +225,9 @@ def constraints(x, dx, dy, filtertf):
     u = tf.slice(x, [0,0,0,0], [batch_size, n_mesh, n_mesh, 1])
     v = tf.slice(x, [0,0,0,1], [batch_size, n_mesh, n_mesh, 1])
     
+    u = u*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    v = v*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+
     u = tf.reshape(u,[batch_size, n_mesh, n_mesh])
     v = tf.reshape(v,[batch_size, n_mesh, n_mesh])
     
