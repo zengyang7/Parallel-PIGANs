@@ -98,11 +98,11 @@ def generator(z, isTrain=True, reuse=False):
         w_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.02)
         b_init = tf.constant_initializer(0.0)
         
-        deconv1 = tf.layers.conv2d_transpose(z, 128, [4, 4], strides=(1, 1), padding='valid', 
+        deconv1 = tf.layers.conv2d_transpose(z, 64, [4, 4], strides=(1, 1), padding='valid', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu1 = lrelu(tf.layers.batch_normalization(deconv1, training=isTrain), 0.2)
         # 2nd hidden layer
-        deconv2 = tf.layers.conv2d_transpose(lrelu1, 128, [5, 5], strides=(2, 2), padding='same', 
+        deconv2 = tf.layers.conv2d_transpose(lrelu1, 64, [5, 5], strides=(2, 2), padding='same', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu2 = lrelu(tf.layers.batch_normalization(deconv2, training=isTrain), 0.2)
         
@@ -130,12 +130,12 @@ def discriminator(x, isTrain=True, reuse=False):
         lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
 
         # 2nd hidden layer
-        conv2 = tf.layers.conv2d(lrelu1, 128, [5, 5], strides=(2, 2), padding='same', 
+        conv2 = tf.layers.conv2d(lrelu1, 64, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain), 0.2)
         
         # 3rd hidden layer
-        conv3 = tf.layers.conv2d(lrelu2, 128, [5, 5], strides=(2, 2), padding='same', 
+        conv3 = tf.layers.conv2d(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain), 0.2)
 
