@@ -23,7 +23,7 @@ np.random.seed(1)
 # parameter need to be changed
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 120
+train_epoch = 2
 lr_setting = 0.0005
 
 # number of mesh
@@ -35,7 +35,7 @@ factor = 10
 print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_setting, train_epoch))
 
 # setting of training samples
-n_sam = 20000
+n_sam = 200
 V_mu, V_sigma = 4, 0.8
 alpha_mu, alpha_sigma = 0, np.pi/4
 m_mu, m_sigma = 1, 0.2
@@ -124,14 +124,14 @@ train_label = samples
 # use to calculate divergence
 d_x = X[:,1:]-X[:,:-1]
 d_y = Y[1:,:]-Y[:-1,:]
-d_x_ = np.tile(d_x, (batch_size, 1)).reshape([batch_size, n_mesh, n_mesh-1])
-d_y_ = np.tile(d_y, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh])
+#d_x_ = np.tile(d_x, (batch_size, 1)).reshape([batch_size, n_mesh, n_mesh-1])
+#d_y_ = np.tile(d_y, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh])
 
 # use to filter divergence
 filter = np.ones((n_mesh-1, n_mesh-1))
 filter[int(n_mesh/2)-int(n_mesh/factor):int(n_mesh/2)+int(n_mesh/factor),
        int(n_mesh/2)-int(n_mesh/factor):int(n_mesh/2)+int(n_mesh/factor)] = 0
-filter_batch = np.tile(filter, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh-1])
+#filter_batch = np.tile(filter, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh-1])
 
 #----------------------------------------------------------------------------#
 #GANs
@@ -209,9 +209,9 @@ def discriminator(x, isTrain=True, reuse=False):
 
         return o, conv4
 
-def constraints(x, dx,dy, filtertf):
+def constraints(x, dx, dy, filtertf):
     # inverse normalization
-    x = x*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    #x = x*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
     '''
     This function is the constraints of potentianl flow, 
     L Phi = 0, L is the laplace calculator
@@ -220,24 +220,43 @@ def constraints(x, dx,dy, filtertf):
     # x.shape [batch_size, n_mesh, n_mesh, 2]
     u = tf.slice(x, [0,0,0,0], [batch_size, n_mesh, n_mesh, 1])
     v = tf.slice(x, [0,0,0,1], [batch_size, n_mesh, n_mesh, 1])
+    u = u*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    v = v*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
     
     u = tf.reshape(u,[batch_size, n_mesh, n_mesh])
     v = tf.reshape(v,[batch_size, n_mesh, n_mesh])
     
     u_left = tf.slice(u, [0,0,0], [batch_size, n_mesh, n_mesh-1])
     u_right = tf.slice(u, [0,0,1], [batch_size, n_mesh, n_mesh-1])
-    d_u = tf.divide(tf.subtract(u_right, u_left), dx)
-    
+      
     v_up = tf.slice(v, [0,0,0], [batch_size, n_mesh-1, n_mesh])
     v_down = tf.slice(v, [0,1,0], [batch_size, n_mesh-1, n_mesh])
-    d_v = tf.divide(tf.subtract(v_down, v_up), dy)
     
-    delta_u = tf.slice(d_u, [0,1,0],[batch_size, n_mesh-1, n_mesh-1])
-    delta_v = tf.slice(d_v, [0,0,1],[batch_size, n_mesh-1, n_mesh-1])
+    du = tf.subtract(u_right, u_left)
+    dv = tf.subtract(v_down, v_up)
+    
+    # 
+    du_dx = []
+    dv_dy = []
+    for i in range(batch_size):
+        du_dx_iter = tf.divide(du[i,:,:], dx)
+        du_dx.append(du_dx_iter)
+        
+        dv_dy_iter = tf.divide(dv[i,:,:], dy)
+        dv_dy.append(dv_dy_iter)
+    du_dx = tf.stack(du_dx)
+    dv_dy = tf.stack(dv_dy)
+    
+    delta_u = tf.slice(du_dx, [0,1,0], [batch_size, n_mesh-1, n_mesh-1])
+    delta_v = tf.slice(dv_dy, [0,0,1], [batch_size, n_mesh-1, n_mesh-1])
     
     divergence_field = delta_u+delta_v
     #filter divergence
-    divergence_filter = tf.multiply(divergence_field, filtertf)
+    divergence_filter = []
+    for i in range(batch_size):
+        divergence_filter.append(tf.multiply(divergence_field[i,:,:], filtertf))
+    divergence_filter = tf.stack(divergence_filter)
+    
     divergence_square = tf.square(divergence_filter)
     delta = tf.reduce_mean(divergence_square,2)
     divergence_mean = tf.reduce_mean(delta, 1)
@@ -256,9 +275,9 @@ x = tf.placeholder(tf.float32, shape=(None, n_mesh, n_mesh, n_label))
 z = tf.placeholder(tf.float32, shape=(None, 1, 1, 100))
 isTrain = tf.placeholder(dtype=tf.bool)
 
-dx = tf.placeholder(tf.float32, shape=(None, n_mesh, n_mesh-1))
-dy = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh))
-filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
+dx = tf.placeholder(tf.float32, shape=(n_mesh, n_mesh-1))
+dy = tf.placeholder(tf.float32, shape=(n_mesh-1, n_mesh))
+filtertf = tf.placeholder(tf.float32, shape=(n_mesh-1, n_mesh-1))
 
 with tf.variable_scope(tf.get_variable_scope()) as var_scope:
 
@@ -269,6 +288,7 @@ with tf.variable_scope(tf.get_variable_scope()) as var_scope:
     D_real, D_real_logits = discriminator(x, isTrain, reuse=tf.AUTO_REUSE)
     D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
     delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
+    print(delta_lose.shape)
     
     # trainable variables for each network
     T_vars = tf.trainable_variables()
@@ -339,12 +359,12 @@ with tf.Session() as sess:
             
             # training generator
             z_ = np.random.normal(0, 1, (batch_size, 1, 1, 100))
-            loss_g_, _ = sess.run([G_loss, G_optim], {z:z_, x:x_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: True})
+            loss_g_, _ = sess.run([G_loss, G_optim], {z:z_, x:x_, dx:d_x, dy:d_y, filtertf:filter, isTrain: True})
     
-            errD = D_loss.eval({z:z_, x:x_, filtertf:filter_batch, isTrain: False})
-            errG = G_loss_only.eval({z: z_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: False})
-            errdelta_real = divergence_mean.eval({z:z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
-            errdelta_lose = delta_lose.eval({z: z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
+            errD = D_loss.eval({z:z_, x:x_, filtertf:filter, isTrain: False})
+            errG = G_loss_only.eval({z: z_, dx:d_x, dy:d_y, filtertf:filter, isTrain: False})
+            errdelta_real = divergence_mean.eval({z:z_, dx:d_x, dy:d_y,filtertf:filter, isTrain: False})
+            errdelta_lose = delta_lose.eval({z: z_, dx:d_x, dy:d_y,filtertf:filter, isTrain: False})
             
             D_losses.append(errD)
             G_losses.append(errG)

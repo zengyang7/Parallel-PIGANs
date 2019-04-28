@@ -121,7 +121,7 @@ def write_tfrecord(datas, labels, filename_TFRecord):
         writer.write(ex.SerializeToString())
     writer.close()
 
-filename_TFRecord = 'Potentialflow.tfrecord'
+filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
 write_tfrecord(U, samples, filename_TFRecord)
 print('Write the tfrecord successfully!')
 

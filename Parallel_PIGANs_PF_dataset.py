@@ -25,6 +25,8 @@ lam_cons = 0.2
 train_epoch = 2
 lr_setting = 0.0005
 
+factor = 10
+
 # number of mesh
 n_mesh = 32 # number of nodes on each mesh
 n_label = 3
@@ -50,14 +52,12 @@ y_mesh = np.linspace(y[0], y[1], int(n_mesh))
 X, Y = np.meshgrid(x_mesh, y_mesh)
 d_x  = X[:,1:]-X[:,:-1]
 d_y  = Y[1:,:]-Y[:-1,:]
-d_x_ = np.tile(d_x, (batch_size, 1)).reshape([batch_size, n_mesh, n_mesh-1])
-d_y_ = np.tile(d_y, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh])
 
 # use to filter divergence
 # why 13:18?
-filter = np.ones((n_mesh-1, n_mesh-1))
-filter[13:18,13:18] = 0
-filter_batch = np.tile(filter, (batch_size, 1)).reshape([batch_size, n_mesh-1, n_mesh-1])
+filter_ = np.ones((n_mesh-1, n_mesh-1))
+filter_[int(n_mesh/2)-int(n_mesh/factor):int(n_mesh/2)+int(n_mesh/factor),
+        int(n_mesh/2)-int(n_mesh/factor):int(n_mesh/2)+int(n_mesh/factor)] = 0
 
 ###############################################################################
 #PI-GANs
@@ -112,6 +112,32 @@ def generator(z, isTrain=True, reuse=False):
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         
+        if n_mesh > 32:
+            # 64*64 image
+            deconv3 = tf.layers.conv2d_transpose(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        elif n_mesh > 64:
+            # 128*128
+            deconv3 = tf.layers.conv2d_transpose(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        elif n_mesh > 128:
+            # 256*256
+            deconv3 = tf.layers.conv2d_transpose(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        elif n_mesh > 256:
+            # 512*512
+            deconv3 = tf.layers.conv2d_transpose(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        elif n_mesh >512:
+            # 1024*1024
+            deconv3 = tf.layers.conv2d_transpose(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+            
         # output layer
         deconv4 = tf.layers.conv2d_transpose(lrelu3, 3, [5, 5], strides=(2, 2), padding='same', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
@@ -126,6 +152,31 @@ def discriminator(x, isTrain=True, reuse=False):
         b_init = tf.constant_initializer(0.0)
 
         # 1st hidden layer
+        if n_mesh > 32:
+            # for 64*64
+            conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
+        elif n_mesh > 64:
+            # for 128*128
+            conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
+        elif n_mesh > 128:
+            # for 256*256
+            conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
+        elif n_mesh > 256:
+            # for 512*512
+            conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
+        elif n_mesh > 512:
+            # for 1024*1024
+            conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
         conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
@@ -146,11 +197,11 @@ def discriminator(x, isTrain=True, reuse=False):
         o = tf.nn.sigmoid(conv4)
 
         return o, conv4
+    
 
 def constraints(x, dx, dy, filtertf):
     # inverse normalization
-    # operation on the whole data, including p?
-    x = x*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    #x = x*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
     '''
     This function is the constraints of potentianl flow, 
     L Phi = 0, L is the laplace calculator
@@ -159,24 +210,43 @@ def constraints(x, dx, dy, filtertf):
     # x.shape [batch_size, n_mesh, n_mesh, 2]
     u = tf.slice(x, [0,0,0,0], [batch_size, n_mesh, n_mesh, 1])
     v = tf.slice(x, [0,0,0,1], [batch_size, n_mesh, n_mesh, 1])
+    u = u*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    v = v*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
     
     u = tf.reshape(u,[batch_size, n_mesh, n_mesh])
     v = tf.reshape(v,[batch_size, n_mesh, n_mesh])
     
-    u_left  = tf.slice(u, [0,0,0], [batch_size, n_mesh, n_mesh-1])
+    u_left = tf.slice(u, [0,0,0], [batch_size, n_mesh, n_mesh-1])
     u_right = tf.slice(u, [0,0,1], [batch_size, n_mesh, n_mesh-1])
-    d_u     = tf.divide(tf.subtract(u_right, u_left), dx)
-    
-    v_up   = tf.slice(v, [0,0,0], [batch_size, n_mesh-1, n_mesh])
+      
+    v_up = tf.slice(v, [0,0,0], [batch_size, n_mesh-1, n_mesh])
     v_down = tf.slice(v, [0,1,0], [batch_size, n_mesh-1, n_mesh])
-    d_v    = tf.divide(tf.subtract(v_down, v_up), dy)
     
-    delta_u = tf.slice(d_u, [0,1,0],[batch_size, n_mesh-1, n_mesh-1])
-    delta_v = tf.slice(d_v, [0,0,1],[batch_size, n_mesh-1, n_mesh-1])
+    du = tf.subtract(u_right, u_left)
+    dv = tf.subtract(v_down, v_up)
+    
+    # partial 
+    du_dx = []
+    dv_dy = []
+    for i in range(batch_size):
+        du_dx_iter = tf.divide(du[i,:,:], dx)
+        du_dx.append(du_dx_iter)
+        
+        dv_dy_iter = tf.divide(dv[i,:,:], dy)
+        dv_dy.append(dv_dy_iter)
+    du_dx = tf.stack(du_dx)
+    dv_dy = tf.stack(dv_dy)
+    
+    delta_u = tf.slice(du_dx, [0,1,0], [batch_size, n_mesh-1, n_mesh-1])
+    delta_v = tf.slice(dv_dy, [0,0,1], [batch_size, n_mesh-1, n_mesh-1])
     
     divergence_field = delta_u+delta_v
     #filter divergence
-    divergence_filter = tf.multiply(divergence_field, filtertf)
+    divergence_filter = []
+    for i in range(batch_size):
+        divergence_filter.append(tf.multiply(divergence_field[i,:,:], filtertf))
+    divergence_filter = tf.stack(divergence_filter)
+    
     divergence_square = tf.square(divergence_filter)
     delta = tf.reduce_mean(divergence_square,2)
     divergence_mean = tf.reduce_mean(delta, 1)
@@ -201,6 +271,7 @@ def average_gradients(tower_grads):
         average_grads.append(grad_and_var)
     return average_grads
 
+
 with tf.device('/cpu:0'):
 
     tower_grads_d = []
@@ -214,9 +285,9 @@ with tf.device('/cpu:0'):
     z = tf.placeholder(tf.float32, shape=(None, 1, 1, 100))
     isTrain = tf.placeholder(dtype=tf.bool)
     
-    dx = tf.placeholder(tf.float32, shape=(None, n_mesh, n_mesh-1))
-    dy = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh))
-    filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
+    dx = tf.placeholder(tf.float32, shape=(n_mesh, n_mesh-1))
+    dy = tf.placeholder(tf.float32, shape=(n_mesh-1, n_mesh))
+    filtertf = tf.placeholder(tf.float32, shape=(n_mesh-1, n_mesh-1))
       
     with tf.variable_scope(tf.get_variable_scope()) as var_scope:
         for i in range(num_gpus):
@@ -291,9 +362,18 @@ with tf.device('/cpu:0'):
     #tf.global_variables_initializer().run()
     init=tf.global_variables_initializer()
     
+    filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
+    # load tf.record
+    queue_train = tf.data.TFRecordDataset(filename_TFRecord)
+    dataset_train = queue_train.map(read_tfrecord).repeat().batch(num_gpus*batch_size)
+    iterator_train = dataset_train.make_initializable_iterator()
+    next_element_train = iterator_train.get_next()
+    
     with tf.Session() as sess:
 
         sess.run(init)
+        sess.run(iterator_train.initializer)
+        
 
         train_hist = {}
         train_hist['D_losses'] = []
@@ -319,21 +399,25 @@ with tf.device('/cpu:0'):
             delta_lose_record = []
             epoch_start_time = time.time()
             # Total problem size unchanged => strong scaling
-            for iter in range(train_set.shape[0] // (num_gpus*batch_size)):
+            for iter in range(20000 // (num_gpus*batch_size)):
                 # training discriminator
-                x_ = train_set[iter*num_gpus*batch_size:(iter+1)*num_gpus*batch_size]
+                train_set, _ = sess.run(next_element_train)
+                train_set[:,:,:,0:2] = (train_set[:,:,:,0:2]-(nor_max_v+nor_min_v)/2)/(1.1*(nor_max_v-nor_min_v)/2)
+                train_set[:,:,:,2] = (train_set[:,:,:,2]-(nor_max_p+nor_min_p)/2)/(1.1*(nor_max_p-nor_min_p)/2)
+                
+                x_ = train_set
                 z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
                 
                 loss_d_, _ = sess.run([D_loss, train_op_D], {x: x_, z: z_, isTrain: True})
                 
                 # training generator
                 z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
-                loss_g_, _ = sess.run([G_loss, train_op_G], {z:z_, x:x_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: True})
+                loss_g_, _ = sess.run([G_loss, train_op_G], {z:z_, x:x_, dx:d_x, dy:d_y, filtertf:filter_, isTrain: True})
         
-                errD = D_loss.eval({z:z_, x:x_, filtertf:filter_batch, isTrain: False})
-                errG = G_loss_only.eval({z: z_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: False})
-                errdelta_real = divergence_mean.eval({z:z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
-                errdelta_lose = delta_lose.eval({z: z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
+                errD = D_loss.eval({z:z_, x:x_, filtertf:filter_, isTrain: False})
+                errG = G_loss_only.eval({z: z_, dx:d_x, dy:d_y, filtertf:filter_, isTrain: False})
+                errdelta_real = divergence_mean.eval({z:z_, dx:d_x, dy:d_y,filtertf:filter_, isTrain: False})
+                errdelta_lose = delta_lose.eval({z: z_, dx:d_x, dy:d_y,filtertf:filter_, isTrain: False})
                 
                 D_losses.append(errD)
                 G_losses.append(errG)
