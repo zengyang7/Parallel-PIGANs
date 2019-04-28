@@ -342,7 +342,7 @@ with tf.device('/cpu:0'):
                         tower_grads_d.append(grads_d)
                         tower_grads_g.append(grads_g)
 
-    with tf.variable_scope(tf.get_variable_scope()) as var_scope:
+    with tf.name_scope("apply_gradients"):
 
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     
@@ -352,9 +352,6 @@ with tf.device('/cpu:0'):
             train_op_D = D_optim.apply_gradients(tower_grads_d, global_step = global_step)
             train_op_G = G_optim.apply_gradients(tower_grads_g)
 
-            # FIXME: Need to put it here or comment it. Do not know why
-            var_scope.reuse_variables()
-    
     #sess = tf.Session()
     #tf.global_variables_initializer().run()
     init=tf.global_variables_initializer()
