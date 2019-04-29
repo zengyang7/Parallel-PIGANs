@@ -29,7 +29,7 @@ lr_setting = 0.0005
 factor = 10
 
 # number of mesh
-n_mesh = 32 # number of nodes on each mesh
+n_mesh = 128 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
 
@@ -112,6 +112,33 @@ def generator(z, isTrain=True, reuse=False):
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         
+        # More hidden layers for different problem sizes
+        if n_mesh > 32:
+            # 64*64 image
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        if n_mesh > 64:
+            # 128*128
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        if n_mesh > 128:
+            # 256*256
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        if n_mesh > 256:
+            # 512*512
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+        if n_mesh >512:
+            # 1024*1024
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+                                                 kernel_initializer=w_init, bias_initializer=b_init)
+            lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
+            
         # output layer
         deconv4 = tf.layers.conv2d_transpose(lrelu3, 3, [5, 5], strides=(2, 2), padding='same', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
@@ -126,6 +153,31 @@ def discriminator(x, isTrain=True, reuse=False):
         b_init = tf.constant_initializer(0.0)
 
         # 1st hidden layer
+        if n_mesh > 32:
+            # for 64*64
+            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
+        if n_mesh > 64:
+            # for 128*128
+            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
+        if n_mesh > 128:
+            # for 256*256
+            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
+        if n_mesh > 256:
+            # for 512*512
+            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
+        if n_mesh > 512:
+            # for 1024*1024
+            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+                                     kernel_initializer=w_init, bias_initializer=b_init)
+            x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
         conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
