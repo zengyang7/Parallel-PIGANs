@@ -17,6 +17,7 @@ if not os.path.isdir(root):
     os.mkdir(root)
     
 tf.reset_default_graph()
+np.random.seed(1)
 
 # parameter need to be changed
 num_gpus = 2

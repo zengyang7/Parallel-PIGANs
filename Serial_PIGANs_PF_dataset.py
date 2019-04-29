@@ -26,11 +26,12 @@ lam_cons = 0.2
 train_epoch = 2
 lr_setting = 0.0005
 
+factor = 10
+
 # number of mesh
 n_mesh = 32 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
-factor = 10
 
 print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_setting, train_epoch))
 
@@ -224,8 +225,8 @@ with tf.variable_scope(tf.get_variable_scope()) as var_scope:
     # networks : discriminator
     D_real, D_real_logits = discriminator(x, isTrain, reuse=tf.AUTO_REUSE)
     D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
+
     delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
-    print(delta_lose.shape)
     
     # trainable variables for each network
     T_vars = tf.trainable_variables()
@@ -259,7 +260,6 @@ with tf.variable_scope(tf.get_variable_scope()) as var_scope:
         G_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(G_loss, var_list=G_vars)
 
 init=tf.global_variables_initializer()
-
 
 filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
 # load tf.record
@@ -301,8 +301,8 @@ with tf.Session() as sess:
             train_set, _ = sess.run(next_element_train)
             train_set[:,:,:,0:2] = (train_set[:,:,:,0:2]-(nor_max_v+nor_min_v)/2)/(1.1*(nor_max_v-nor_min_v)/2)
             train_set[:,:,:,2] = (train_set[:,:,:,2]-(nor_max_p+nor_min_p)/2)/(1.1*(nor_max_p-nor_min_p)/2)
+
             x_ = train_set
-            
             z_ = np.random.normal(0, 1, (batch_size, 1, 1, 100))
             
             loss_d_, _ = sess.run([D_loss, D_optim], {x: x_, z: z_, isTrain: True})
