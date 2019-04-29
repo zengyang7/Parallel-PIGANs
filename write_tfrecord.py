@@ -9,7 +9,7 @@ Created on Fri Apr 26 10:18:33 2019
 import numpy as np
 import tensorflow as tf
 
-n_mesh = 32 # number of nodes on each mesh
+n_mesh = 256 # number of nodes on each mesh
 
 # setting of training samples
 n_sam = 20000
@@ -49,51 +49,41 @@ def generate_sample(n, parameter):
 
     # For all samples, X and Y are the same (on a same mesh)
     X, Y = np.meshgrid(x_mesh, y_mesh)  
-    U    = []
     
     #filter_x = np.ones((n_mesh, n_mesh, 3))
     #filter_x[14:17,14:17] = 0
     
     # What is the index i used for?
-    for i, p in enumerate(parameter):
-        V = p[0]
-        alpha  = p[1]
-        m = p[2]
+    V = parameter[0]
+    alpha  = parameter[1]
+    m = parameter[2]
         
-        # velocity of uniform
-        u1 = np.ones([n, n])*V*np.cos(alpha)
-        v1 = np.ones([n, n])*V*np.sin(alpha)
+    # velocity of uniform
+    u1 = np.ones([n, n])*V*np.cos(alpha)
+    v1 = np.ones([n, n])*V*np.sin(alpha)
         
-        # velocity of source
-        # u2 = m/2pi * x/(x^2+y^2)
-        # v2 = m/2pi * y/(x^2+y^2)
-        u2 = m/(2*np.pi)*X/(X**2+Y**2)
-        v2 = m/(2*np.pi)*Y/(X**2+Y**2)
+    # velocity of source
+    # u2 = m/2pi * x/(x^2+y^2)
+    # v2 = m/2pi * y/(x^2+y^2)
+    u2 = m/(2*np.pi)*X/(X**2+Y**2)
+    v2 = m/(2*np.pi)*Y/(X**2+Y**2)
         
-        u = u1+u2
-        v = v1+v2
+    u = u1+u2
+    v = v1+v2
         
-        # Bernoulli's principle
-        # constant=0, rho = 1
-        p = 0-1/2*(u**2+v**2)
+    # Bernoulli's principle
+    # constant=0, rho = 1
+    p = 0-1/2*(u**2+v**2)
         
-        U_data = np.zeros([n, n, 3])
+    U_data = np.zeros([n, n, 3])
         
-        U_data[:, :, 0] = u
-        U_data[:, :, 1] = v
-        U_data[:, :, 2] = p
-        U.append(U_data)
-    return X, Y, np.asarray(U)
+    U_data[:, :, 0] = u
+    U_data[:, :, 1] = v
+    U_data[:, :, 2] = p
+    return X, Y, U_data
 
 # generate training samples
-X, Y, U = generate_sample(n=n_mesh, parameter=samples)
-
-# normalization
-nor = []
-nor.append(np.max(U[:,:,:,0:2]))
-nor.append(np.min(U[:,:,:,0:2]))
-nor.append(np.max(U[:,:,:,2]))
-nor.append(np.min(U[:,:,:,2]))
+# X, Y, U = generate_sample(n=n_mesh, parameter=samples)
 
 def make_example(image, label):
     return tf.train.Example(features=tf.train.Features(feature={
@@ -101,7 +91,7 @@ def make_example(image, label):
             'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[label]))
     }))
 
-def write_tfrecord(datas, labels, filename_TFRecord):
+def write_tfrecord(n_mesh, n_sam, filename_TFRecord):
     '''
     This function is to write the TFRecord file
     
@@ -111,18 +101,40 @@ def write_tfrecord(datas, labels, filename_TFRecord):
         filename_TFRecord - name of TFRecord
     '''
     writer = tf.python_io.TFRecordWriter(filename_TFRecord)
-    num = len(datas)
-    for i in range(num):
-        data = datas[i]
-        label = labels[i]
+    
+    max_v = []
+    min_v = []
+    max_p = []
+    min_p = []
+    
+    nor = []
+    
+    for i in range(n_sam):
+        V_sample     = np.random.normal(V_mu, V_sigma, 1)
+        alpha_sample = np.random.normal(alpha_mu, alpha_sigma, 1)
+        m_sample     = np.random.normal(m_mu, m_sigma, 1)
+        label = np.asarray([V_sample, alpha_sample, m_sample])
+        
+        _, _, data = generate_sample(n_mesh, label)
+        max_v.append(np.max(data[:,:,:2]))
+        max_p.append(np.max(data[:,:,2]))
+        min_v.append(np.min(data[:,:,:2]))
+        min_p.append(np.min(data[:,:,2]))
+        
         ex = make_example(data.tobytes(), label.tobytes())
         
         # 需要写在循环里
         writer.write(ex.SerializeToString())
     writer.close()
+    nor.append(np.max(max_v))
+    nor.append(np.max(min_v))
+    nor.append(np.max(max_p))
+    nor.append(np.max(min_p))
+    return nor
+    
 
 filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
-write_tfrecord(U, samples, filename_TFRecord)
+nor = write_tfrecord(n_mesh, n_sam, filename_TFRecord)
 print('Write the tfrecord successfully!')
 
 ##############################################################################
@@ -152,19 +164,19 @@ def read_tfrecord(filename_queue):
     
     return image, label
 
-# load tf.record
-queue_train = tf.data.TFRecordDataset(filename_TFRecord)
-dataset_train = queue_train.map(read_tfrecord).repeat().batch(n_sam)
-iterator_train = dataset_train.make_initializable_iterator()
-next_element_train = iterator_train.get_next()
-
-sess = tf.Session()
-sess.run(tf.global_variables_initializer())
-sess.run(iterator_train.initializer)
-batch_x, batch_y = sess.run(next_element_train)
-delta_verified = batch_x - U
-
-if np.max(delta_verified)==0.0 and np.max(delta_verified)==0.0:
-    print('The tfrecord is correct!')
+## load tf.record
+#queue_train = tf.data.TFRecordDataset(filename_TFRecord)
+#dataset_train = queue_train.map(read_tfrecord).repeat().batch(n_sam)
+#iterator_train = dataset_train.make_initializable_iterator()
+#next_element_train = iterator_train.get_next()
+#
+#sess = tf.Session()
+#sess.run(tf.global_variables_initializer())
+#sess.run(iterator_train.initializer)
+#batch_x, batch_y = sess.run(next_element_train)
+#delta_verified = batch_x - U
+#
+#if np.max(delta_verified)==0.0 and np.max(delta_verified)==0.0:
+#    print('The tfrecord is correct!')
 
 np.savetxt('NormalizedParameter', nor)
