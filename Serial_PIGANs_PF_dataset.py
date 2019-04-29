@@ -361,12 +361,12 @@ with tf.Session() as sess:
             
             # training generator
             z_ = np.random.normal(0, 1, (batch_size, 1, 1, 100))
-            loss_g_, _ = sess.run([G_loss, G_optim], {z:z_, x:x_, dx:d_x, dy:d_y, filtertf:filter, isTrain: True})
+            loss_g_, _ = sess.run([G_loss, G_optim], {z:z_, x:x_, dx:d_x, dy:d_y, filtertf:filter_, isTrain: True})
     
-            errD = D_loss.eval({z:z_, x:x_, filtertf:filter, isTrain: False})
-            errG = G_loss_only.eval({z: z_, dx:d_x, dy:d_y, filtertf:filter, isTrain: False})
-            errdelta_real = divergence_mean.eval({z:z_, dx:d_x, dy:d_y,filtertf:filter, isTrain: False})
-            errdelta_lose = delta_lose.eval({z: z_, dx:d_x, dy:d_y,filtertf:filter, isTrain: False})
+            errD = D_loss.eval({z:z_, x:x_, filtertf:filter_, isTrain: False})
+            errG = G_loss_only.eval({z: z_, dx:d_x, dy:d_y, filtertf:filter_, isTrain: False})
+            errdelta_real = divergence_mean.eval({z:z_, dx:d_x, dy:d_y,filtertf:filter_, isTrain: False})
+            errdelta_lose = delta_lose.eval({z: z_, dx:d_x, dy:d_y,filtertf:filter_, isTrain: False})
             
             D_losses.append(errD)
             G_losses.append(errG)

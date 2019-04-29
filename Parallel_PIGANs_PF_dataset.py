@@ -133,7 +133,7 @@ def generator(z, isTrain=True, reuse=False):
             deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
             lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
-        if n_mesh >512:
+        if n_mesh > 512:
             # 1024*1024
             deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
