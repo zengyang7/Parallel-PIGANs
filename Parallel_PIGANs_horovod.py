@@ -310,12 +310,16 @@ with tf.variable_scope(tf.get_variable_scope()) as var_scope:
     G_loss_only = -tf.reduce_mean(D_fake_logits)
     G_loss = G_loss_only + lam_cons*tf.log(delta_loss+1)
     
-    global_step = tf.contrib.framework.get_or_create_global_step()
+    
     # optimizer for each network 
     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         optim = tf.train.AdamOptimizer(lr*hvd.size(), beta1=0.5)
+        optim = hvd.DistributedOptimizer(optim)
+        global_step = tf.contrib.framework.get_or_create_global_step()
         D_optim = optim.minimize(D_loss, global_step=global_step, var_list=D_vars)
         G_optim = optim.minimize(G_loss, global_step=global_step, var_list=G_vars)
+
+
 hooks = [hvd.BroadcastGlobalVariablesHook(0),
          #Hook that requests stop at a specified step.
          tf.train.StopAtStepHook(last_step=20000 // hvd.size()),

@@ -178,5 +178,5 @@ def read_tfrecord(filename_queue):
 #
 #if np.max(delta_verified)==0.0 and np.max(delta_verified)==0.0:
 #    print('The tfrecord is correct!')
-
-np.savetxt('NormalizedParameter', nor)
+name = 'NormalizedParameter'+str(n_mesh)
+np.savetxt(name, nor)

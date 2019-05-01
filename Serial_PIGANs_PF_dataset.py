@@ -36,7 +36,7 @@ batch_size = 100
 print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_setting, train_epoch))
 
 # load normalization parameter
-nor = np.loadtxt('NormalizedParameter')
+nor = np.loadtxt('NormalizedParameter'+str(n_mesh))
 nor_max_v = nor[0]
 nor_min_v = nor[1]
 nor_max_p = nor[2]
@@ -404,7 +404,7 @@ with tf.Session() as sess:
     
     end_time = time.time()
     total_ptime = end_time - start_time
-    name_data = root + 'Serial-results'+'-ep'+str(train_epoch)
+    name_data = root + 'Serial-mesh'+str(n_mesh)+'-convalue'+str(cons_value)
     np.savez_compressed(name_data, a=train_hist, b=per_epoch_ptime)
     save_model = name_data+'.ckpt'
     save_path = saver.save(sess, save_model)

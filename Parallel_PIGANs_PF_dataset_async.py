@@ -340,8 +340,12 @@ with tf.device('/cpu:0'):
                         grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
                         grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
 
-                        train_op_D = D_optim.apply_gradients(grads_d, global_step = global_step)
-                        train_op_G = G_optim.apply_gradients(grads_g)
+    with tf.name_scope("apply_gradients"):
+
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+
+            train_op_D = D_optim.apply_gradients(grads_d, global_step = global_step)
+            train_op_G = G_optim.apply_gradients(grads_g)
 
     #sess = tf.Session()
     #tf.global_variables_initializer().run()
