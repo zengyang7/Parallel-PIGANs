@@ -17,7 +17,6 @@ if not os.path.isdir(root):
     os.mkdir(root)
     
 tf.reset_default_graph()
-np.random.seed(1)
 
 # parameter need to be changed
 num_gpus = 2
@@ -37,7 +36,7 @@ print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_settin
 
 
 # load normalization parameter
-nor = np.loadtxt('NormalizedParameter')
+nor = np.loadtxt('NormalizedParameter'+str(n_mesh))
 nor_max_v = nor[0]
 nor_min_v = nor[1]
 nor_max_p = nor[2]
@@ -398,11 +397,10 @@ with tf.device('/cpu:0'):
             # Total problem size unchanged => strong scaling
             for iter in range(20000 // (num_gpus*batch_size)):
                 # training discriminator
-                train_set, _ = sess.run(next_element_train)
-                train_set[:,:,:,0:2] = (train_set[:,:,:,0:2]-(nor_max_v+nor_min_v)/2)/(1.1*(nor_max_v-nor_min_v)/2)
-                train_set[:,:,:,2] = (train_set[:,:,:,2]-(nor_max_p+nor_min_p)/2)/(1.1*(nor_max_p-nor_min_p)/2)
+                x_, _ = sess.run(next_element_train)
+                x_[:,:,:,0:2] = (x_[:,:,:,0:2]-(nor_max_v+nor_min_v)/2)/(1.1*(nor_max_v-nor_min_v)/2)
+                x_[:,:,:,2] = (x_[:,:,:,2]-(nor_max_p+nor_min_p)/2)/(1.1*(nor_max_p-nor_min_p)/2)
                 
-                x_ = train_set
                 z_ = np.random.normal(0, 1, (num_gpus*batch_size, 1, 1, 100))
                 
                 loss_d_, _ = sess.run([D_loss, train_op_D], {x: x_, z: z_, isTrain: True})
@@ -452,7 +450,7 @@ with tf.device('/cpu:0'):
 
         end_time = time.time()
         total_ptime = end_time - start_time
-        name_data = root + 'Parallel-results'+'-ep'+str(train_epoch)
+        name_data = root + 'Parallel-mesh'+str(n_mesh)+'-convalue'+str(cons_value)+'-numGPU'+str(num_gpus)
         np.savez_compressed(name_data, a=train_hist, b=per_epoch_ptime)
         save_model = name_data+'.ckpt'
         save_path = saver.save(sess, save_model)
