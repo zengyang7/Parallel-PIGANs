@@ -320,8 +320,18 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     # D_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(D_loss, var_list=D_vars)
     G_optim = tf.train.AdamOptimizer(lr, beta1=0.5).minimize(G_loss, var_list=G_vars)
 
-sess = tf.InteractiveSession()
+
+# load tf.record
+filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
+queue_train = tf.data.TFRecordDataset(filename_TFRecord)
+dataset_train = queue_train.map(read_tfrecord).repeat().batch(batch_size)
+iterator_train = dataset_train.make_initializable_iterator()
+next_element_train = iterator_train.get_next()
+
+
+sess = tf.Session()
 tf.global_variables_initializer().run()
+sess.run(iterator_train.initializer)
 
 train_hist = {}
 train_hist['D_losses'] = []
@@ -340,12 +350,7 @@ np.random.seed(int(time.time()))
 print('training start!')
 start_time = time.time()
 
-# load tf.record
-filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
-queue_train = tf.data.TFRecordDataset(filename_TFRecord)
-dataset_train = queue_train.map(read_tfrecord).repeat().batch(batch_size)
-iterator_train = dataset_train.make_initializable_iterator()
-next_element_train = iterator_train.get_next()
+
 
 for epoch in range(train_epoch+1):
     G_losses = []
