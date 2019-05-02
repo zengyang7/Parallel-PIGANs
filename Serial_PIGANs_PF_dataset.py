@@ -24,12 +24,12 @@ np.random.seed(1)
 cons_value = 0
 lam_cons = 0.2
 train_epoch = 200
-lr_setting = 0.0005
+lr_setting = 0.0001
 
 factor = 10
 
 # number of mesh
-n_mesh = 64 # number of nodes on each mesh
+n_mesh = 128 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
 

@@ -19,11 +19,11 @@ if not os.path.isdir(root):
 tf.reset_default_graph()
 
 # parameter need to be changed
-num_gpus = 4
+num_gpus = 2
 cons_value = 0
 lam_cons = 0.2
 train_epoch = 200
-lr_setting = 0.0005
+lr_setting = 0.00005
 
 factor = 10
 
@@ -344,6 +344,8 @@ with tf.device('/cpu:0'):
                         
                         tower_grads_d.append(grads_d)
                         tower_grads_g.append(grads_g)
+                    if i==0:
+                        G_predict = generator(z, isTrain)
 
     with tf.name_scope("apply_gradients"):
 
@@ -433,21 +435,12 @@ with tf.device('/cpu:0'):
             #root + 'PF-WGANGP-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
             
             z_pred = np.random.normal(0, 1, (16, 1, 1, 100))
-            prediction = G_z.eval({z:z_pred, isTrain: False})
+            prediction = sess.run(G_predict, {z:z_pred, isTrain: False})
             #prediction = prediction*np.max(U)+np.max(U)/2
             prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
             prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
+            print(prediction[0,0,0:5,0])
             train_hist['prediction'].append(prediction)
-            #plot_samples(X, Y, prediction)
-            #plot_samples(X, Y, prediction, name)
-            if epoch % 20 == 0:
-                np.random.seed(1)
-                z_pred = np.random.normal(0, 1, (2000, 1, 1, 100))
-                prediction = G_z.eval({z:z_pred, isTrain: False})
-                prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
-                prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
-                train_hist['prediction_fit'].append(prediction)
-
         end_time = time.time()
         total_ptime = end_time - start_time
         name_data = root + 'Parallel-mesh'+str(n_mesh)+'-convalue'+str(cons_value)+'-numGPU'+str(num_gpus)
