@@ -18,8 +18,8 @@ np.random.seed(1)
 # parameter need to be changed
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 2
-lr_setting = 0.0005
+train_epoch = 40
+lr_setting = 0.005
 
 # number of mesh
 n_mesh = 32
@@ -31,6 +31,7 @@ factor = 10
 print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_setting, train_epoch))
 
 nor = np.loadtxt('NormalizedParameter'+str(n_mesh))
+print('Normalization: ', nor)
 nor_max_v = nor[0]
 nor_min_v = nor[1]
 nor_max_p = nor[2]
@@ -329,7 +330,7 @@ iterator_train = dataset_train.make_initializable_iterator()
 next_element_train = iterator_train.get_next()
 
 
-sess = tf.Session()
+sess = tf.InteractiveSession()
 tf.global_variables_initializer().run()
 sess.run(iterator_train.initializer)
 

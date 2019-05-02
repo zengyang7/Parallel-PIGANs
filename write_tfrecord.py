@@ -11,7 +11,7 @@ import tensorflow as tf
 
 np.random.seed(1)
 
-n_mesh = 32 # number of nodes on each mesh
+n_mesh = 256 # number of nodes on each mesh
 
 # setting of training samples
 n_sam = 20000
