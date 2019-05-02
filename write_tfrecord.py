@@ -11,10 +11,10 @@ import tensorflow as tf
 
 np.random.seed(1)
 
-n_mesh = 256 # number of nodes on each mesh
+n_mesh = 32 # number of nodes on each mesh
 
 # setting of training samples
-n_sam = 200
+n_sam = 20000
 V_mu, V_sigma = 4, 0.8
 alpha_mu, alpha_sigma = 0, np.pi/4
 m_mu, m_sigma = 1, 0.2
@@ -174,9 +174,9 @@ def write_tfrecord(n_mesh, n_sam, samples, filename_TFRecord):
         writer.write(ex.SerializeToString())
     writer.close()
     nor.append(np.max(max_v))
-    nor.append(np.max(min_v))
+    nor.append(np.min(min_v))
     nor.append(np.max(max_p))
-    nor.append(np.max(min_p))
+    nor.append(np.min(min_p))
     return nor
    
 
