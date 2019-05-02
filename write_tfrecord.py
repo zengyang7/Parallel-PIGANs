@@ -9,10 +9,12 @@ Created on Fri Apr 26 10:18:33 2019
 import numpy as np
 import tensorflow as tf
 
+np.random.seed(1)
+
 n_mesh = 256 # number of nodes on each mesh
 
 # setting of training samples
-n_sam = 20000
+n_sam = 200
 V_mu, V_sigma = 4, 0.8
 alpha_mu, alpha_sigma = 0, np.pi/4
 m_mu, m_sigma = 1, 0.2
@@ -82,8 +84,57 @@ def generate_sample(n, parameter):
     U_data[:, :, 2] = p
     return X, Y, U_data
 
-# generate training samples
-# X, Y, U = generate_sample(n=n_mesh, parameter=samples)
+def generate_sample_all(n, parameter):
+    ''' 
+    generate samples of potential flow
+    two kinds of potential flows are used : Uniform and source
+    Uniform: F1(z) = V*exp(-i*alpha)*z
+    source:  F2(z) = m/(2*pi)*log(z)
+    x: interval of x axis
+    y: interval of y axis
+    n: number size of mesh
+    parameter: V, alpha, m
+    output: u, v the velocity of x and y direction
+    '''
+    # mesh
+    x = [-0.5, 0.5]
+    y = [-0.5, 0.5]
+    x_mesh = np.linspace(x[0], x[1], int(n))
+   
+    y_mesh = np.linspace(y[0], y[1], int(n))
+    
+    X, Y = np.meshgrid(x_mesh, y_mesh)  
+    U = []
+    
+    for i, p in enumerate(parameter):
+        V = p[0]
+        alpha  = p[1]
+        m = p[2]
+        
+        # velocity of uniform
+        u1 = np.ones([n, n])*V*np.cos(alpha)
+        v1 = np.ones([n, n])*V*np.sin(alpha)
+        
+        # velocity of source
+        # u2 = m/2pi * x/(x^2+y^2)
+        # v2 = m/2pi * y/(x^2+y^2)
+        u2 = m/(2*np.pi)*X/(X**2+Y**2)
+        v2 = m/(2*np.pi)*Y/(X**2+Y**2)
+        
+        u = u1+u2
+        v = v1+v2
+        
+        # Bernoulli's principle
+        # constant=0, rho = 1
+        p = 0-1/2*(u**2+v**2)
+        
+        U_data = np.zeros([n, n, 3])
+        U_data[:, :, 0] = u
+        U_data[:, :, 1] = v
+        U_data[:, :, 2] = p
+        U.append(U_data)
+    return X, Y, np.asarray(U)
+
 
 def make_example(image, label):
     return tf.train.Example(features=tf.train.Features(feature={
@@ -91,7 +142,7 @@ def make_example(image, label):
             'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[label]))
     }))
 
-def write_tfrecord(n_mesh, n_sam, filename_TFRecord):
+def write_tfrecord(n_mesh, n_sam, samples, filename_TFRecord):
     '''
     This function is to write the TFRecord file
     
@@ -110,11 +161,7 @@ def write_tfrecord(n_mesh, n_sam, filename_TFRecord):
     nor = []
     
     for i in range(n_sam):
-        V_sample     = np.random.normal(V_mu, V_sigma, 1)
-        alpha_sample = np.random.normal(alpha_mu, alpha_sigma, 1)
-        m_sample     = np.random.normal(m_mu, m_sigma, 1)
-        label = np.asarray([V_sample, alpha_sample, m_sample])
-        
+        label = samples[i]      
         _, _, data = generate_sample(n_mesh, label)
         max_v.append(np.max(data[:,:,:2]))
         max_p.append(np.max(data[:,:,2]))
@@ -131,10 +178,10 @@ def write_tfrecord(n_mesh, n_sam, filename_TFRecord):
     nor.append(np.max(max_p))
     nor.append(np.max(min_p))
     return nor
-    
+   
 
 filename_TFRecord = 'Potentialflow'+str(n_mesh)+'.tfrecord'
-nor = write_tfrecord(n_mesh, n_sam, filename_TFRecord)
+nor = write_tfrecord(n_mesh, n_sam, samples, filename_TFRecord)
 print('Write the tfrecord successfully!')
 
 ##############################################################################
@@ -164,12 +211,14 @@ def read_tfrecord(filename_queue):
     
     return image, label
 
-## load tf.record
+## generate training samples
+#X, Y, U = generate_sample_all(n=n_mesh, parameter=samples)
+### load tf.record
 #queue_train = tf.data.TFRecordDataset(filename_TFRecord)
 #dataset_train = queue_train.map(read_tfrecord).repeat().batch(n_sam)
 #iterator_train = dataset_train.make_initializable_iterator()
 #next_element_train = iterator_train.get_next()
-#
+##
 #sess = tf.Session()
 #sess.run(tf.global_variables_initializer())
 #sess.run(iterator_train.initializer)
