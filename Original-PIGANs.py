@@ -24,7 +24,7 @@ np.random.seed(1)
 num_gpus = 1
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 2
+train_epoch = 20
 lr_setting = 0.0005
 
 # number of mesh
