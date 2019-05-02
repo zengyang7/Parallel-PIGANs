@@ -81,7 +81,7 @@ def generate_sample(n, parameter):
     return X, Y, np.asarray(U)
 
 # setting of training samples
-n_sam = 2000
+n_sam = 20000
 V_mu, V_sigma = 4, 0.8
 alpha_mu, alpha_sigma = 0, np.pi/4
 m_mu, m_sigma = 1, 0.2
@@ -202,6 +202,64 @@ def discriminator(x, isTrain=True, reuse=False):
         o = tf.nn.sigmoid(conv4)
 
         return o, conv4
+    
+def constraints_loop(x, dx, dy, filtertf):
+    # inverse normalization
+    #x = x*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    '''
+    This function is the constraints of potentianl flow, 
+    L Phi = 0, L is the laplace calculator
+    Phi is potential function
+    '''
+    # x.shape [batch_size, n_mesh, n_mesh, 2]
+    u = tf.slice(x, [0,0,0,0], [batch_size, n_mesh, n_mesh, 1])
+    v = tf.slice(x, [0,0,0,1], [batch_size, n_mesh, n_mesh, 1])
+    u = u*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    v = v*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
+    
+    u = tf.reshape(u,[batch_size, n_mesh, n_mesh])
+    v = tf.reshape(v,[batch_size, n_mesh, n_mesh])
+    
+    u_left = tf.slice(u, [0,0,0], [batch_size, n_mesh, n_mesh-1])
+    u_right = tf.slice(u, [0,0,1], [batch_size, n_mesh, n_mesh-1])
+      
+    v_up = tf.slice(v, [0,0,0], [batch_size, n_mesh-1, n_mesh])
+    v_down = tf.slice(v, [0,1,0], [batch_size, n_mesh-1, n_mesh])
+    
+    du = tf.subtract(u_right, u_left)
+    dv = tf.subtract(v_down, v_up)
+    
+    # partial 
+    du_dx = []
+    dv_dy = []
+    for i in range(batch_size):
+        du_dx_iter = tf.divide(du[i,:,:], dx)
+        du_dx.append(du_dx_iter)
+        
+        dv_dy_iter = tf.divide(dv[i,:,:], dy)
+        dv_dy.append(dv_dy_iter)
+    du_dx = tf.stack(du_dx)
+    dv_dy = tf.stack(dv_dy)
+    
+    delta_u = tf.slice(du_dx, [0,1,0], [batch_size, n_mesh-1, n_mesh-1])
+    delta_v = tf.slice(dv_dy, [0,0,1], [batch_size, n_mesh-1, n_mesh-1])
+    
+    divergence_field = delta_u+delta_v
+    #filter divergence
+    divergence_filter = []
+    for i in range(batch_size):
+        divergence_filter.append(tf.multiply(divergence_field[i,:,:], filtertf))
+    divergence_filter = tf.stack(divergence_filter)
+    
+    divergence_square = tf.square(divergence_filter)
+    delta = tf.reduce_mean(divergence_square,2)
+    divergence_mean = tf.reduce_mean(delta, 1)
+    
+    # soft constraints
+    kesi = tf.ones(tf.shape(divergence_mean))*(cons_value)
+    delta_lose_ = divergence_mean - kesi
+    delta_lose_ = tf.nn.relu(delta_lose_)
+    return delta_lose_, divergence_mean
 
 def constraints(x, dx,dy, filtertf):
     # inverse normalization
@@ -254,6 +312,11 @@ dx = tf.placeholder(tf.float32, shape=(None, n_mesh, n_mesh-1))
 dy = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh))
 filtertf = tf.placeholder(tf.float32, shape=(None, n_mesh-1, n_mesh-1))
 
+dx_loop = tf.placeholder(tf.float32, shape=(n_mesh, n_mesh-1))
+dy_loop = tf.placeholder(tf.float32, shape=(n_mesh-1, n_mesh))
+filtertf_loop = tf.placeholder(tf.float32, shape=(n_mesh-1, n_mesh-1))
+
+
 # networks : generator
 G_z = generator(z, isTrain)
 
@@ -261,6 +324,8 @@ G_z = generator(z, isTrain)
 D_real, D_real_logits = discriminator(x, isTrain)
 D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=tf.AUTO_REUSE)
 delta_lose, divergence_mean = constraints(G_z, dx, dy, filtertf)
+
+delta_lose_loop, divergence_mean_loop = constraints(G_z, dx_loop, dy_loop, filtertf_loop)
 
 # trainable variables for each network
 T_vars = tf.trainable_variables()
@@ -327,6 +392,7 @@ for epoch in range(train_epoch+1):
     D_losses = []
     delta_real_record = []
     delta_lose_record = []
+    delta_real_loop_record = []
     epoch_start_time = time.time()
     for iter in range(train_set.shape[0] // batch_size):
         # training discriminator
@@ -342,19 +408,25 @@ for epoch in range(train_epoch+1):
         errD = D_loss.eval({z:z_, x:x_, filtertf:filter_batch, isTrain: False})
         errG = G_loss_only.eval({z: z_, dx:d_x_, dy:d_y_, filtertf:filter_batch, isTrain: False})
         errdelta_real = divergence_mean.eval({z:z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
-        errdelta_lose = delta_lose.eval({z: z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
         
+        errdelta_real_loop = divergence_mean.eval({z:z_, dx_loop:d_x, dy_loop:d_y, filtertf_loop:filter, isTrain: False})
+        
+        errdelta_lose = delta_lose.eval({z: z_, dx:d_x_, dy:d_y_,filtertf:filter_batch, isTrain: False})
         D_losses.append(errD)
         G_losses.append(errG)
         delta_real_record.append(errdelta_real)
         delta_lose_record.append(errdelta_lose)
-
+        delta_real_loop_record.append(errdelta_real_loop)
+        
     epoch_end_time = time.time()
     if math.isnan(np.mean(G_losses)):
         break
     per_epoch_ptime = epoch_end_time - epoch_start_time
     print('[%d/%d] - ptime: %.2f loss_d: %.3f, loss_g: %.3f, delta: %.3f' % 
           ((epoch + 1), train_epoch, per_epoch_ptime, np.mean(D_losses), np.mean(G_losses), np.mean(delta_real_record)))
+    
+    print('loop divergence: %.3f'%(np.mean(delta_real_loop_record)))
+    
     train_hist['D_losses'].append(np.mean(D_losses))
     train_hist['G_losses'].append(np.mean(G_losses))
     train_hist['delta_real'].append(np.mean(delta_real_record))
