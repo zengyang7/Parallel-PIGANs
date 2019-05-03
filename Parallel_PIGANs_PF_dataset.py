@@ -19,7 +19,7 @@ if not os.path.isdir(root):
 tf.reset_default_graph()
 
 # parameter need to be changed
-num_gpus = 2
+num_gpus = 4
 cons_value = 0
 lam_cons = 0.2
 train_epoch = 200
