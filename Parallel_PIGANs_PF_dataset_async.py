@@ -23,13 +23,13 @@ np.random.seed(1)
 num_gpus = 2
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 2
-lr_setting = 0.0005
+train_epoch = 200
+lr_setting = 0.00005
 
 factor = 10
 
 # number of mesh
-n_mesh = 32 # number of nodes on each mesh
+n_mesh = 64 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
 
@@ -99,43 +99,43 @@ def generator(z, isTrain=True, reuse=False):
         w_init = tf.truncated_normal_initializer(mean=0.0, stddev=0.02)
         b_init = tf.constant_initializer(0.0)
         
-        deconv1 = tf.layers.conv2d_transpose(z, 64, [4, 4], strides=(1, 1), padding='valid', 
+        deconv1 = tf.layers.conv2d_transpose(z, 32, [4, 4], strides=(1, 1), padding='valid', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu1 = lrelu(tf.layers.batch_normalization(deconv1, training=isTrain), 0.2)
         # 2nd hidden layer
-        deconv2 = tf.layers.conv2d_transpose(lrelu1, 64, [5, 5], strides=(2, 2), padding='same', 
+        deconv2 = tf.layers.conv2d_transpose(lrelu1, 32, [5, 5], strides=(2, 2), padding='same', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu2 = lrelu(tf.layers.batch_normalization(deconv2, training=isTrain), 0.2)
         
         # 3rd layer
-        deconv3 = tf.layers.conv2d_transpose(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+        deconv3 = tf.layers.conv2d_transpose(lrelu2, 32, [5, 5], strides=(2, 2), padding='same', 
                                              kernel_initializer=w_init, bias_initializer=b_init)
         lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         
         # More hidden layers for different problem sizes
         if n_mesh > 32:
             # 64*64 image
-            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 32, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
             lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         if n_mesh > 64:
             # 128*128
-            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 32, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
             lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         if n_mesh > 128:
             # 256*256
-            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 32, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
             lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         if n_mesh > 256:
             # 512*512
-            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 32, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
             lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
         if n_mesh > 512:
             # 1024*1024
-            deconv3 = tf.layers.conv2d_transpose(lrelu3, 64, [5, 5], strides=(2, 2), padding='same', 
+            deconv3 = tf.layers.conv2d_transpose(lrelu3, 32, [5, 5], strides=(2, 2), padding='same', 
                                                  kernel_initializer=w_init, bias_initializer=b_init)
             lrelu3 = lrelu(tf.layers.batch_normalization(deconv3, training=isTrain), 0.2)
             
@@ -155,40 +155,40 @@ def discriminator(x, isTrain=True, reuse=False):
         # 1st hidden layer
         if n_mesh > 32:
             # for 64*64
-            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+            x = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', 
                                      kernel_initializer=w_init, bias_initializer=b_init)
             x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
         if n_mesh > 64:
             # for 128*128
-            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+            x = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', 
                                      kernel_initializer=w_init, bias_initializer=b_init)
             x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
         if n_mesh > 128:
             # for 256*256
-            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+            x = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', 
                                      kernel_initializer=w_init, bias_initializer=b_init)
             x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
         if n_mesh > 256:
             # for 512*512
-            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+            x = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', 
                                      kernel_initializer=w_init, bias_initializer=b_init)
             x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
         if n_mesh > 512:
             # for 1024*1024
-            x = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+            x = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', 
                                      kernel_initializer=w_init, bias_initializer=b_init)
             x = lrelu(tf.layers.batch_normalization(x, training=isTrain), 0.2)
-        conv1 = tf.layers.conv2d(x, 64, [5, 5], strides=(2, 2), padding='same', 
+        conv1 = tf.layers.conv2d(x, 32, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
 
         # 2nd hidden layer
-        conv2 = tf.layers.conv2d(lrelu1, 64, [5, 5], strides=(2, 2), padding='same', 
+        conv2 = tf.layers.conv2d(lrelu1, 32, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain), 0.2)
         
         # 3rd hidden layer
-        conv3 = tf.layers.conv2d(lrelu2, 64, [5, 5], strides=(2, 2), padding='same', 
+        conv3 = tf.layers.conv2d(lrelu2, 32, [5, 5], strides=(2, 2), padding='same', 
                                  kernel_initializer=w_init, bias_initializer=b_init)
         lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain), 0.2)
 
@@ -339,6 +339,8 @@ with tf.device('/cpu:0'):
                     
                         grads_d = D_optim.compute_gradients(D_loss, var_list = D_vars)
                         grads_g = G_optim.compute_gradients(G_loss, var_list = G_vars)
+                    if i == 0:
+                        G_predict = generator(z, isTrain)
 
     with tf.name_scope("apply_gradients"):
 
@@ -355,6 +357,7 @@ with tf.device('/cpu:0'):
     # load tf.record
     queue_train = tf.data.TFRecordDataset(filename_TFRecord)
     dataset_train = queue_train.map(read_tfrecord).repeat().batch(num_gpus*batch_size)
+    dataset_train = dataset_train.prefetch(3)
     iterator_train = dataset_train.make_initializable_iterator()
     next_element_train = iterator_train.get_next()
     
@@ -426,24 +429,18 @@ with tf.device('/cpu:0'):
             #root + 'PF-WGANGP-cons'+str(cons_value)+'-lam'+str(lam_cons)+'-lr'+str(lr_setting)+'-ep'+str(train_epoch)
             
             z_pred = np.random.normal(0, 1, (16, 1, 1, 100))
-            prediction = G_z.eval({z:z_pred, isTrain: False})
+            prediction = sess.run(G_predict, {z:z_pred, isTrain: False})
             #prediction = prediction*np.max(U)+np.max(U)/2
             prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
             prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
+            print(prediction[0,0,0:5,0])
             train_hist['prediction'].append(prediction)
             #plot_samples(X, Y, prediction)
             #plot_samples(X, Y, prediction, name)
-            if epoch % 20 == 0:
-                np.random.seed(1)
-                z_pred = np.random.normal(0, 1, (2000, 1, 1, 100))
-                prediction = G_z.eval({z:z_pred, isTrain: False})
-                prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
-                prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
-                train_hist['prediction_fit'].append(prediction)
-
+           
         end_time = time.time()
         total_ptime = end_time - start_time
-        name_data = root + 'Parallel-results'+'-ep'+str(train_epoch)
+        name_data = root + 'Parallel-asys'+'-ep'+str(train_epoch)
         np.savez_compressed(name_data, a=train_hist, b=per_epoch_ptime)
         save_model = name_data+'.ckpt'
         save_path = saver.save(sess, save_model)
