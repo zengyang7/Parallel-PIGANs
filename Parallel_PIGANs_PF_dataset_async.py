@@ -23,13 +23,13 @@ np.random.seed(1)
 num_gpus = 2
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 200
-lr_setting = 0.00005
+train_epoch = 3
+lr_setting = 0.0005
 
 factor = 10
 
 # number of mesh
-n_mesh = 64 # number of nodes on each mesh
+n_mesh = 32 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
 
@@ -37,7 +37,7 @@ print('cons: %.3f lam: %.3f lr: %.6f ep: %.3f' %(cons_value, lam_cons, lr_settin
 
 
 # load normalization parameter
-nor = np.loadtxt('NormalizedParameter')
+nor = np.loadtxt('NormalizedParameter'+str(n_mesh))
 nor_max_v = nor[0]
 nor_min_v = nor[1]
 nor_max_p = nor[2]
