@@ -29,7 +29,7 @@ lr_setting = 0.00005
 factor = 10
 
 # number of mesh
-n_mesh = 64 # number of nodes on each mesh
+n_mesh = 32 # number of nodes on each mesh
 n_label = 3
 batch_size = 100
 
