@@ -23,8 +23,8 @@ np.random.seed(1)
 # parameter need to be changed
 cons_value = 0
 lam_cons = 0.2
-train_epoch = 200
-lr_setting = 0.00005
+train_epoch = 10
+lr_setting = 0.002
 
 factor = 10
 
@@ -333,6 +333,7 @@ with tf.Session() as sess:
     train_hist['prediction'] = []
     train_hist['prediction_fit'] = []
     train_hist['ratio'] = []
+    train_hist['validate'] = []
     
     # save model and all variables
     saver = tf.train.Saver()
@@ -361,6 +362,17 @@ with tf.Session() as sess:
             
             # training generator
             z_ = np.random.normal(0, 1, (batch_size, 1, 1, 100))
+	    
+	    # new added
+            if epoch == train_epoch:
+                indx = 2
+                if iter == indx:
+                    z_validate = np.zeros([1,1,1,100])
+                    my_shape = train_set.shape
+                    train_validate = np.zeros([1,my_shape[1],my_shape[2],3])
+                    z_validate[0,:,:,:] = z_[indx,:,:,:]
+                    train_validate[0,:,:,:] = train_set[indx,:,:,:]
+
             loss_g_, _ = sess.run([G_loss, G_optim], {z:z_, x:x_, dx:d_x, dy:d_y, filtertf:filter_, isTrain: True})
     
             errD = D_loss.eval({z:z_, x:x_, filtertf:filter_, isTrain: False})
@@ -388,6 +400,10 @@ with tf.Session() as sess:
         
         z_pred = np.random.normal(0, 1, (16, 1, 1, 100))
         prediction = G_z.eval({z:z_pred, isTrain: False})
+        if epoch == train_epoch:
+            prediction_validate = G_z.eval({z:z_validate, isTrain: False})
+            train_hist['validate'].append(train_validate)
+            train_hist['validate'].append(prediction_validate)
         #prediction = prediction*np.max(U)+np.max(U)/2
         prediction[:,:,:,0:2] = prediction[:,:,:,0:2]*(1.1*(nor_max_v-nor_min_v)/2)+(nor_max_v+nor_min_v)/2
         prediction[:,:,:,2] = prediction[:,:,:,2]*(1.1*(nor_max_p-nor_min_p)/2)+(nor_max_p+nor_min_p)/2
